@@ -129,6 +129,22 @@ Metrics/PerceivedComplexity:
     - test/**/*
     - '**/contract/*'
   Max: 10
+# ⚠⚠ ここのプロジェクトは minitest ではなく **test-unit** を使っている。
+# 下の 4 つは、test-unit に存在しないメソッドへ言い換えさせる。適用すると
+# `NoMethodError` になるが、⚠ **rubocop は緑のまま通るのでテストを実行するまで
+# 気づけない。**（例: minitest は `assert_path_exists`、test-unit は
+# `assert_path_exist` と単数形）
+#
+# ⚠ `assert_includes` や `assert_predicate` のように test-unit にもあるものは
+# 問題ないので、rubocop-minitest 全体を切る必要はない。
+Minitest/AssertPathExists:
+  Enabled: false
+Minitest/RefutePathExists:
+  Enabled: false
+Minitest/AssertOutput:
+  Enabled: false
+Minitest/AssertSilent:
+  Enabled: false
 Minitest/MultipleAssertions:
   Enabled: false
 Minitest/ReturnInTestMethod:
