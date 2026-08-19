@@ -62,6 +62,24 @@
 
 「環境が壊れている」を理由に lint / test を飛ばさない。`bundle install` 等で環境を作ってから必ず実行する。簡単な環境構築は確認を取らずに進めてよい。
 
+⚠⚠ **CI も同じ。** 2026-08-19 まで `ginseng-*` 全 7 gem の CI は `rake test` を呼んでおらず、**計 366 件のテストが一度も走っていなかった**。ワークフロー名が `test` でも中身が lint だけなら、緑は「lint が通った」以上の意味を持たない。
+
+## CI
+
+`ginseng-*` の CI は、手順本体を [.github/actions/ruby-check](../.github/actions/ruby-check/action.yml)（composite action）に置き、各 gem の `.github/workflows/test.yml` から呼ぶ。
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: pooza/ginseng-style/.github/actions/ruby-check@main
+```
+
+⚠ **`matrix` / `services` / `schedule` は呼び出し側に残す。** Ruby の対応版・必要なミドルウェアは gem ごとに違う。共通化するのは手順だけ。
+
+- **週次の `schedule:` を必ず置く。** ⚠ push 契機だけだと、更新が止まった gem は永遠に緑のまま赤に気づけない。実例: `ginseng-postgres` の CI は 4 ヶ月赤のまま誰も気づかなかった
+- ⚠ **`schedule:` はデフォルトブランチでしか動かない。** feature ブランチに置いても発火しない
+- ⚠ ginseng-style を壊すと全 gem の CI が同時に止まる。この gem の CI が緑であることを先に確認してから配る
+
 ## ginseng-* の変更手順
 
 ⚠ **`ginseng-*` は複数のプロジェクトが同時に使う。** アプリ側の都合で gem を直すと、他の利用者に黙って影響が出る。

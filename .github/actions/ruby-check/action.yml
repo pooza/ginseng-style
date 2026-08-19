@@ -1,0 +1,66 @@
+name: ruby-check
+description: ginseng-* 共通の CI 手順（bundle install → lint → test）
+
+# ⚠ 各 gem の .github/workflows/test.yml から呼ぶ。手順の正本はここ 1 箇所。
+# matrix・services・schedule は gem ごとに違うので、呼び出し側に残す。
+
+inputs:
+  bundler:
+    description: インストールする bundler のバージョン制約
+    required: false
+    default: '~>4.0'
+  bundle-update:
+    description: rake bundle:update を実行するか
+    required: false
+    default: 'true'
+  bundle-check:
+    description: rake bundle:check を実行するか
+    required: false
+    default: 'true'
+  cert-check:
+    description: rake cert:check を実行するか（証明書を持つ gem のみ）
+    required: false
+    default: 'false'
+  lint:
+    description: rubocop を実行するか
+    required: false
+    default: 'true'
+  test:
+    description: rake test を実行するか
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: bundle install
+      shell: bash
+      run: |
+        gem install bundler -v '${{ inputs.bundler }}'
+        bundle install --jobs 4 --retry 3
+
+    - name: bundle update
+      if: inputs.bundle-update == 'true'
+      shell: bash
+      run: bundle exec rake bundle:update
+
+    - name: bundle check
+      if: inputs.bundle-check == 'true'
+      shell: bash
+      run: bundle exec rake bundle:check
+
+    - name: cert check
+      if: inputs.cert-check == 'true'
+      shell: bash
+      run: bundle exec rake cert:check
+
+    - name: lint
+      if: inputs.lint == 'true'
+      shell: bash
+      run: bundle exec rubocop
+
+    # ⚠ ここが今回の本題。2026-08-19 まで、どの gem も CI でテストを走らせていなかった。
+    - name: test
+      if: inputs.test == 'true'
+      shell: bash
+      run: bundle exec rake test
