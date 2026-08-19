@@ -142,6 +142,10 @@ Metrics/PerceivedComplexity:
 #
 # ⚠ `assert_includes` や `assert_predicate` のように test-unit にもあるものは
 # 問題ないので、rubocop-minitest 全体を切る必要はない。
+#
+# 🔴 実例: `Minitest/ReturnInTestMethod` が `return if ...` を `skip if ...` へ
+# 自動修正し、あるリポジトリの CI が **1 年半以上テストで落ち続けていた**
+# （2025-01-02 〜 2026-08-20）。⚠ lint は緑のままだった。docs/rationale.md 参照。
 Minitest/AssertPathExists:
   Enabled: false
 Minitest/RefutePathExists:
