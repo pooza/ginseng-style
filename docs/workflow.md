@@ -70,7 +70,7 @@
 
 ```yaml
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v5
   - uses: pooza/ginseng-style/.github/actions/ruby-check@main
 ```
 
