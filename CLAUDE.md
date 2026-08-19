@@ -11,6 +11,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 | [docs/ruby.md](docs/ruby.md) | Ruby の書き方。RuboCop に落とせない規約と、設定の「なぜ」 |
 | [docs/workflow.md](docs/workflow.md) | Issue 駆動・ブランチ・マイルストーン・リリース前レビュー・**`ginseng-*` の変更手順** |
 | [docs/writing.md](docs/writing.md) | 表記規約。用語・パスとキーの書き方・⚠ マーカーの使い方 |
+| [docs/rationale.md](docs/rationale.md) | なぜ正本化したか。drift の実測とその実害、設計の決定の理由 |
 
 ⚠ **他のプロジェクトのセッションから参照されるドキュメントなので、書き換えたら波及範囲を意識すること。**
 
