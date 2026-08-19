@@ -21,7 +21,9 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 ## ⚠ ginseng-* の利用者
 
-`Gemfile` / `*.gemspec` で `ginseng` を参照しているリポジトリが対象。gem 側（`ginseng-fediverse` / `ginseng-web` / `ginseng-redis` / `ginseng-postgres` / `ginseng-piefed` / `ginseng-youtube`）とアプリ側（`mulukhiya-toot-proxy` / `makoto2` / `cure-api` / `tomato-shrieker` / `loquat` / `shooby-do-bop` / `dqdai-anniv` / `writersbase-tools` / `writersbase-env` / `chubo2` / `chubo-core`）の両方がある。
+`Gemfile` / `*.gemspec` で `ginseng` を参照しているリポジトリが対象。gem 側（`ginseng-fediverse` / `ginseng-web` / `ginseng-redis` / `ginseng-postgres` / `ginseng-piefed` / `ginseng-youtube`）とアプリ側（`mulukhiya-toot-proxy` / `makoto2` / `cure-api` / `tomato-shrieker` / `loquat` / `shooby-do-bop` / `dqdai-anniv` / `chubo-core`）、および **private リポジトリ数本**がある。
+
+⚠ **このリポジトリは public。** private リポジトリと他 org のリポジトリの名前は書かない。⚠⚠ **全リストはセッションメモリ側が正本**（`ginseng-*` 管理セッションの `project_ginseng-consumers`）。
 
 ⚠ **`capsicum-relay` は `.rubocop.yml` を持つが ginseng に依存していない。** 配布対象に含めるかは別途判断する。
 
@@ -29,15 +31,17 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 `Gemfile.lock` は git 参照のリビジョンを固定するので、**リポジトリごとに違う版が刺さったまま進む**。`ginseng-core` の HEAD が 2026-08-18 の時点で、刺さっている版は **8 種類**、最古は **2026-04-14（4 ヶ月前）** だった。
 
-| 版 | 日付 | 刺さっているリポジトリ |
+| 版 | 日付 | 備考 |
 | --- | --- | --- |
-| `ab02f5e36e` | 2026-08-16 | mulukhiya-toot-proxy / ginseng-fediverse |
-| `d1878f777f` | 2026-08-13 | cure-api / chubo2 |
-| `de82ea13eb` | 2026-08-06 | ginseng-web |
-| `edaa47a69e` | 2026-08-02 | writersbase-env |
-| `4b134cebaf` | 2026-07-30 | makoto2 / tomato-shrieker / loquat / shooby-do-bop / dqdai-anniv |
-| `0a3a69c93c` | 2026-07-09 | chubo-core / ginseng-redis |
-| `e510866901` | 2026-04-14 | 🔴 writersbase-tools |
+| `ab02f5e36e` | 2026-08-16 | 最新に近い（2 リポジトリ） |
+| `d1878f777f` | 2026-08-13 | 2 リポジトリ |
+| `de82ea13eb` | 2026-08-06 | 1 リポジトリ |
+| `edaa47a69e` | 2026-08-02 | 1 リポジトリ |
+| `4b134cebaf` | 2026-07-30 | **5 リポジトリ**（最多） |
+| `0a3a69c93c` | 2026-07-09 | 2 リポジトリ |
+| `e510866901` | 2026-04-14 | 🔴 1 リポジトリ（4 ヶ月前） |
+
+⚠ 内訳（どのリポジトリがどの版か）はセッションメモリ側にある。
 
 ⚠ **security 修正が一部にしか届いていない状態になりやすい。** 実例: [pooza/makoto2#101](https://github.com/pooza/makoto2/issues/101)（`Gemfile.lock` が 1.15.28 で止まり security 修正 6 件を取り込めていない）。棚卸しのワンライナーは [workflow.md](workflow.md) の「ピン留めのばらけを放置しない」にある。
 
