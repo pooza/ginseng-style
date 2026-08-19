@@ -114,7 +114,12 @@ PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて�
 
 ```sh
 repo=<owner>/<repo>
-gh api --paginate "repos/$repo/pulls/comments?per_page=100" | jq -s add > /tmp/codex.json
+# ⚠⚠ gh を単独で走らせ、終了ステータスを見てから jq に渡す。パイプで繋ぐと
+#   パイプ全体の状態が jq のものになり、ページングの途中で失敗しても
+#   「出し終えた分だけ」を全履歴として走査してしまう ＝ 偽のゼロ。
+gh api --paginate "repos/$repo/pulls/comments?per_page=100" > /tmp/codex-raw.json \
+  || { echo '走査に失敗した。結果を信用しないこと' >&2; exit 1; }
+jq -s add /tmp/codex-raw.json > /tmp/codex.json
 jq -r '. as $all | $all[] | . as $c
   | select(.user.login == "chatgpt-codex-connector[bot]")
   | select(([$all[] | select(.in_reply_to_id == $c.id)] | length) == 0
@@ -124,6 +129,7 @@ jq -r '. as $all | $all[] | . as $c
 
 - ⚠⚠ **`gh pr list --limit N` で回す形にしない。** N 本より古い PR に遅れて届いたレビューへ永遠に到達しない ＝ **この節が防ごうとしている失敗そのもの**
 - ⚠ **`gh api` は `--paginate` を付けないと 1 ページ目しか見ない**
+- ⚠⚠ **`gh api ... | jq` と繋がない。** 失敗したページングを握り潰し、**部分的な結果を「全部見た」として扱う**
 - ⚠⚠ **`reactions.total_count` を完了判定に使わない。** 👀 や ❤️ が 1 つ付いただけで非ゼロになり、**未処理のものが走査から消える**。**返信の有無**と **👍 / 👎 の数**を別々に見る
 
 ⚠ **`pulls/comments` は行に紐づくレビューコメントしか返さない。** PR 本体のコメントは `repos/$repo/issues/comments` で同じように取る。**他リポジトリを触っている別セッションからの申し送りはこちらに来る**（投稿者は bot ではなく人）。⚠ **open PR も対象に含める**（上の API はどちらも含む）。
