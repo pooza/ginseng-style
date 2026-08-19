@@ -1,0 +1,9 @@
+package:
+  authors:
+    - Tatsuya Koishi
+  description: ginseng coding style and conventions
+  email:
+    - tkoishi@b-shock.co.jp
+  license: MIT
+  url: https://github.com/pooza/ginseng-style
+  version: 1.0.0

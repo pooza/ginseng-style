@@ -1,0 +1,5 @@
+# 自分自身にも正本を適用する。⚠ 利用側は `inherit_gem` を使うこと（README 参照）。
+inherit_from: config/rubocop.yml
+
+AllCops:
+  TargetRubyVersion: 3.3
