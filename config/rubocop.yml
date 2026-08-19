@@ -12,6 +12,11 @@
 #   AllCops:
 #     TargetRubyVersion: 4.0
 #
+# ⚠⚠ 継承先で `AllCops/Exclude` や `AllCops/Include` を書くと、**ここの配列を
+# 置換する**（マージされない）。`Include: [bin/foo]` とだけ書いた時点で lint 対象が
+# `bin/foo` だけになるが、⚠ **rubocop は「1 file inspected, no offenses」と出して
+# 緑のまま通る。** 詳細と対処は README の「プロジェクト固有として残してよいもの」。
+#
 # 設定の「なぜ」は docs/ruby.md にある。cop を切った理由がコードの書き方の規約に
 # なっている箇所（`Style/RedundantReturn` など）は、必ずそちらも読むこと。
 plugins:

@@ -39,6 +39,32 @@ AllCops:
 
 ⚠ **共通に見える緩和を勝手に足さないこと。** 1 リポジトリの都合を全体に配ることになる。共通化したい場合は Issue を立てる。
 
+### ⚠⚠ `Include` / `Exclude` は継承した配列を「置換」する
+
+`inherit_gem` した先で `AllCops/Include` や `AllCops/Exclude` を書くと、**マージされずに置換される**。⚠ **`rubocop` は緑のまま通る**ので気づけない（`Include: [bin/foo]` とだけ書くと「1 file inspected, no offenses」になる）。
+
+- **`Exclude` は `inherit_mode` で足す**
+- ⚠ **`Include` は `inherit_mode` に入れない。** 入れると rubocop 既定の Include（`Gemfile` など）まで戻ってきて、他のリポジトリと lint 対象がずれる。**必要な分を全部書く**
+
+```yaml
+inherit_gem:
+  ginseng-style: config/rubocop.yml
+
+inherit_mode:
+  merge:
+    - Exclude
+
+AllCops:
+  Exclude:
+    - seed/**/*      # 継承した Exclude に足される
+  Include:
+    - '**/*.rb'      # ⚠ 置換されるので、継承分も含めて全部書く
+    - '**/Rakefile'
+    - bin/makoto
+```
+
+⚠⚠ **配る前に `bundle exec rubocop --list-target-files` の差分がゼロであることを確認する。** `--show-cops` の差分ゼロだけでは**この事故を検出できない**（cop の顔ぶれは変わらないため）。
+
 ## 規約
 
 RuboCop で機械的に守れないものはこちら。
