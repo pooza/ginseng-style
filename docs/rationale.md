@@ -67,6 +67,6 @@
 
 ## ⚠ 配るときの検証
 
-**`bundle exec rubocop --show-cops` の差分がゼロ**（ロードされる cop の顔ぶれが移行前と完全一致）であることを確認してから配る。
+**`bundle exec rubocop --show-cops` の差分がゼロ**（ロードされる cop の顔ぶれが移行前と完全一致）であることを確認してから配る。⚠⚠ **`--list-target-files` の差分ゼロも見ること。** cop の顔ぶれが同じでも、lint 対象そのものが消えていることがある（[README](../README.md#-include--exclude-は継承した配列を置換する) の `Include` / `Exclude` の置換）。実例: `makoto2` で 87 ファイル → 1 ファイルになったが、**rubocop は緑のまま通った**。
 
 ⚠ **`ginseng-postgres` だけ 671 → 726 に増えた。** 旧 `.rubocop.yml` の `require:` に `rubocop-minitest` が無く、**Minitest 系 55 cop が一度もロードされていなかった**（gemspec には `add_development_dependency` として書かれていたのに）。⚠ **差分ゼロを期待して測ると、こういう「元が壊れていた」が拾える。**

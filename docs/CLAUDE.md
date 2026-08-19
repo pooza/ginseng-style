@@ -14,7 +14,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 1. このリポジトリで `bundle exec rubocop` を通す
 2. **利用側 1 リポジトリで試す**。`bundle update ginseng-style && bundle exec rubocop` が緑になることを確認する。⚠ `NewCops: enable` と利用側の `TargetRubyVersion` の組み合わせで、いま緑のものが赤くなりうる
-3. 問題なければ残りへ配る。1 リポジトリ 1 PR、`rake lint` が緑になったところまで
+3. 問題なければ残りへ配る。1 リポジトリ 1 PR、`rake lint` が緑になったところまで。⚠⚠ **`--show-cops` と `--list-target-files` の差分がどちらもゼロであることを確認する**（[README](../README.md) の `Include` / `Exclude` の置換）
 4. 破壊的な変更（既存コードの書き換えを要求するもの）は、配る前に Issue で予告する
 
 ⚠ **緩和を足す方向の変更は特に慎重に。** 1 リポジトリの都合を全体に配ることになる。
