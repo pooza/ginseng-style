@@ -17,10 +17,6 @@ inputs:
     description: rake bundle:check を実行するか
     required: false
     default: 'true'
-  cert-update:
-    description: rake cert:update を実行するか（証明書を持つ gem のみ）
-    required: false
-    default: 'false'
   cert-check:
     description: rake cert:check を実行するか（証明書を持つ gem のみ）
     required: false
@@ -52,13 +48,6 @@ runs:
       if: inputs.bundle-check == 'true'
       shell: bash
       run: bundle exec rake bundle:check
-
-    # ⚠ cert:update は CA 証明書を取得して書き出す。cert:check はその鮮度を
-    # 検査するだけなので、⚠⚠ 取得せずに検査だけ回すと古いまま落ちる。
-    - name: cert update
-      if: inputs.cert-update == 'true'
-      shell: bash
-      run: bundle exec rake cert:update
 
     - name: cert check
       if: inputs.cert-check == 'true'
