@@ -101,6 +101,24 @@ for d in ~/repos/*/; do
 done
 ```
 
+## Codex のレビューを取り残さない
+
+PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて届く。**返信とリアクションの両方を付けて完了**とする。⚠ **リアクション 0 ＝ 未処理**、という判定に使えるようにするため。
+
+- ⚠⚠ **却下する指摘にも 👎 を付ける。** リアクション 0 のまま残すと、**次のセッションが同じ検証をやり直す**
+- 直せるものは修正 PR、直さない／後回しにするものは Issue を立ててから返信する
+- ⚠ **窓を件数で切らない。** Codex はマージ後に届くので、PR の流量が多い時期ほど「直近 5 件」から押し出される。実例: モロヘイヤで **P1 が 2 件、4 日放置**された（「SSRF を塞いだ」という認識のまま、実際には塞げていなかった）
+- ⚠⚠ **PR を出したセッションは、締める直前にもう一度走査する。** 走査したあとに着いたコメントがそのまま落ちる。「さっき棚卸しした」は理由にならない
+
+```sh
+for n in $(gh pr list --repo <owner>/<repo> --state all --limit 25 --json number --jq '.[].number'); do
+  gh api "repos/<owner>/<repo>/pulls/$n/comments" \
+    --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.reactions.total_count == 0) | "PR'"$n"' \(.id) \(.path)"'
+done
+```
+
+⚠ **`pulls/{n}/comments` は行に紐づくレビューコメントしか返さない。** PR 本体のコメントは `issues/{n}/comments` で別に取る。**他リポジトリを触っている別セッションからの申し送りはこちらに来る**（投稿者は bot ではなく人）。⚠ **open PR も対象に含める。**
+
 ## 表記
 
 ドキュメントとコミットメッセージの表記規約は [writing.md](writing.md) にある。
