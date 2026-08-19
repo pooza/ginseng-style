@@ -1,6 +1,9 @@
 name: test
 on:
-  - push
+  push:
+  # ⚠ push 契機だけだと、更新が止まった gem は永遠に緑のままになる。
+  schedule:
+    - cron: '25 0 * * 1'
 env:
   CI: 'true'
 jobs:
@@ -14,11 +17,11 @@ jobs:
           - ruby:3.4
           - ruby:4.0
     steps:
-      - uses: actions/checkout@v3
-      - name: bundle install
-        run: |
-          gem install bundler -v '~>2.0'
-          bundle install --jobs 4 --retry 3
-      - name: Run lint
-        run: |
-          bundle exec rubocop
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ruby-check
+        with:
+          # ⚠ この gem は設定と docs を配るだけで、ライブラリの実装を持たない。
+          # bundle:check は Ginseng::Environment に依存するが、ginseng-core に
+          # 依存させると循環するので実行しない。テストも持たない。
+          bundle-check: 'false'
+          test: 'false'
