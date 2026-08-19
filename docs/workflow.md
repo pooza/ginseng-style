@@ -103,21 +103,32 @@ done
 
 ## Codex のレビューを取り残さない
 
-PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて届く。**返信とリアクションの両方を付けて完了**とする。⚠ **リアクション 0 ＝ 未処理**、という判定に使えるようにするため。
+PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて届く。**返信と 👍 / 👎 の両方を付けて完了**とする。⚠ **両方が揃っていないもの ＝ 未処理**、という判定に使えるようにするため。
 
-- ⚠⚠ **却下する指摘にも 👎 を付ける。** リアクション 0 のまま残すと、**次のセッションが同じ検証をやり直す**
+- ⚠⚠ **却下する指摘にも 👎 を付ける。** 何も付けずに残すと、**次のセッションが同じ検証をやり直す**
 - 直せるものは修正 PR、直さない／後回しにするものは Issue を立ててから返信する
-- ⚠ **窓を件数で切らない。** Codex はマージ後に届くので、PR の流量が多い時期ほど「直近 5 件」から押し出される。実例: モロヘイヤで **P1 が 2 件、4 日放置**された（「SSRF を塞いだ」という認識のまま、実際には塞げていなかった）
+- ⚠⚠ **窓を件数で切らない。** Codex はマージ後に届くので、PR の流量が多い時期ほど新しい PR に押し出される。実例: モロヘイヤで **P1 が 2 件、4 日放置**された（「SSRF を塞いだ」という認識のまま、実際には塞げていなかった）
 - ⚠⚠ **PR を出したセッションは、締める直前にもう一度走査する。** 走査したあとに着いたコメントがそのまま落ちる。「さっき棚卸しした」は理由にならない
 
+**PR を列挙して回さない。** リポジトリ全体のレビューコメントを `--paginate` で取る。
+
 ```sh
-for n in $(gh pr list --repo <owner>/<repo> --state all --limit 25 --json number --jq '.[].number'); do
-  gh api "repos/<owner>/<repo>/pulls/$n/comments" \
-    --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.reactions.total_count == 0) | "PR'"$n"' \(.id) \(.path)"'
-done
+repo=<owner>/<repo>
+gh api --paginate "repos/$repo/pulls/comments?per_page=100" | jq -s add > /tmp/codex.json
+jq -r '. as $all | $all[] | . as $c
+  | select(.user.login == "chatgpt-codex-connector[bot]")
+  | select(([$all[] | select(.in_reply_to_id == $c.id)] | length) == 0
+           or ((.reactions["+1"] // 0) + (.reactions["-1"] // 0)) == 0)
+  | "PR#\(.pull_request_url | split("/") | last) \(.id) \(.path)"' /tmp/codex.json
 ```
 
-⚠ **`pulls/{n}/comments` は行に紐づくレビューコメントしか返さない。** PR 本体のコメントは `issues/{n}/comments` で別に取る。**他リポジトリを触っている別セッションからの申し送りはこちらに来る**（投稿者は bot ではなく人）。⚠ **open PR も対象に含める。**
+- ⚠⚠ **`gh pr list --limit N` で回す形にしない。** N 本より古い PR に遅れて届いたレビューへ永遠に到達しない ＝ **この節が防ごうとしている失敗そのもの**
+- ⚠ **`gh api` は `--paginate` を付けないと 1 ページ目しか見ない**
+- ⚠⚠ **`reactions.total_count` を完了判定に使わない。** 👀 や ❤️ が 1 つ付いただけで非ゼロになり、**未処理のものが走査から消える**。**返信の有無**と **👍 / 👎 の数**を別々に見る
+
+⚠ **`pulls/comments` は行に紐づくレビューコメントしか返さない。** PR 本体のコメントは `repos/$repo/issues/comments` で同じように取る。**他リポジトリを触っている別セッションからの申し送りはこちらに来る**（投稿者は bot ではなく人）。⚠ **open PR も対象に含める**（上の API はどちらも含む）。
+
+🔴 **2026-08-20 に壊れた走査で「取り残しゼロ」と報告し、取り直したら `ginseng-*` 8 リポジトリで未処理 21 件（最古 2026-02-10）が出た。** 走査そのものを疑うこと。
 
 ## 表記
 
