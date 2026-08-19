@@ -58,9 +58,12 @@ AllCops:
   Exclude:
     - seed/**/*      # 継承した Exclude に足される
   Include:
-    - '**/*.rb'      # ⚠ 置換されるので、継承分も含めて全部書く
+    # ⚠ 置換されるので、継承分（config/rubocop.yml の 3 つ）も含めて全部書く。
+    #   1 つでも落とすと、そのパターンのファイルが黙って lint 対象から外れる。
+    - '**/*.rb'
     - '**/Rakefile'
-    - bin/makoto
+    - '**/config.ru'
+    - bin/makoto     # ここから下がプロジェクト固有
 ```
 
 ⚠⚠ **配る前に `bundle exec rubocop --list-target-files` の差分がゼロであることを確認する。** `--show-cops` の差分ゼロだけでは**この事故を検出できない**（cop の顔ぶれは変わらないため）。
