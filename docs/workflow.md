@@ -37,7 +37,10 @@
 - **アプリ側は `main`（リリース）と `develop`（開発）を持つ**
 - 作業は feature ブランチを切る。命名は `fix/<issue>-<slug>` / `feat/<issue>-<slug>` / `docs/<issue>-<slug>`
 - ⚠ `gh pr create` は `--base` を必ず明示する。省略すると default branch が宛先になり、**フォークでは upstream に向く**
-- ⚠⚠ **`develop` があっても、`main` より遅れているならそれは現行ではない。** 死んだ `develop` の CI 定義を現行と誤読して、composite action に不要な入力を足した実例がある（[pooza/ginseng-core#521](https://github.com/pooza/ginseng-core/pull/521) へ誤爆 → #5 → #7 で取り消し）。**参照する前に `main` との差を見る**
+- ⚠⚠ **`develop` を現行と決めてかからない。** 死んだ `develop` の CI 定義を現行と誤読して、composite action に不要な入力を足した実例がある（[pooza/ginseng-core#521](https://github.com/pooza/ginseng-core/pull/521) へ誤爆 → #5 → #7 で取り消し）
+- ⚠ **`behind` の数では見ない。** 現役の `develop` も `main` より数コミット遅れる。実測（2026-08-22）では、生きているアプリ側 4 本はいずれも **behind 1〜3 かつ ahead 4〜57** だった
+- ⚠⚠ **`ahead 0` だけでも死亡と判定しない。** リリース直後など、固有コミットを `main` に入れ切った現役の `develop` は一時的に ahead 0 になる。**最終コミット日時と、直近の PR がどこ宛に出ているか**まで見る
+- 🔴 死んでいる例（`ginseng-core` の `develop`）: ahead 2 / behind 112、固有 2 件はどちらも `main` へ到達済み、最終コミットは 2026-08-19 で以降 `main` に 112 件入っていた。**ahead だけ見ても、最終更新だけ見ても足りない**
 
 ## マイルストーン
 
