@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bundle exec rubocop)",
+      "Bash(bundle exec rubocop *)",
+      "Bash(bundle exec rake lint)",
+      "Bash(bundle exec rake rubocop:lint)",
+      "Bash(bundle exec rake -T)",
+      "Bash(rake lint)",
+      "Bash(rake -T)",
+      "Bash(bundle show *)",
+      "Bash(bundle info *)",
+      "Bash(bundle list)",
+      "Bash(bundle exec gem list *)"
+    ]
+  }
+}
