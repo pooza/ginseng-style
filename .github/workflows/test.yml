@@ -4,6 +4,10 @@ on:
   # ⚠ push 契機だけだと、更新が止まった gem は永遠に緑のままになる。
   schedule:
     - cron: '25 0 * * 1'
+# ⚠⚠ 手順本体は pooza/ginseng-style の composite action を @main で参照している。
+# そこに入った変更が、このリポジトリの GITHUB_TOKEN を持って動く。既定に頼らず絞る。
+permissions:
+  contents: read
 env:
   CI: 'true'
 jobs:
@@ -18,6 +22,10 @@ jobs:
           - ruby:4.0
     steps:
       - uses: actions/checkout@v5
+        with:
+          # ⚠ 既定では認証情報がワークツリーの git config に残る。後続のステップから
+          # 使えてしまうので消す。依存 gem は public な github: 参照なので影響しない。
+          persist-credentials: false
       - uses: ./.github/actions/ruby-check
         with:
           # ⚠ この gem は設定と docs を配るだけで、ライブラリの実装を持たない。
