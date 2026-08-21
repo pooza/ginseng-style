@@ -63,10 +63,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
         run: |
           set -uo pipefail
+          bad=0
           for r in $GEMS; do
             if gh workflow run test.yml -R "pooza/$r"; then
               echo "dispatched  pooza/$r"
             else
-              echo "::warning::pooza/$r の test.yml を起動できない（workflow_dispatch: が無い可能性）"
+              # ⚠⚠ 起動できなければ「実行の担保」が成立していない。残りは続けるが、
+              # 最後に必ず落とす。warning にすると全部失敗しても緑のままになる。
+              echo "::error::pooza/$r の test.yml を起動できない（workflow_dispatch: が無い / トークンの権限不足）"
+              bad=1
             fi
           done
+          exit $bad
