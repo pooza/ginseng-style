@@ -57,8 +57,10 @@ jobs:
           exit $bad
 
       # ⚠ 状態が赤でも起動は試みる。無効化されていない gem のテストまで止めない。
+      # ⚠⚠ always() ではなく !cancelled()。always() はキャンセル時も true を返すので、
+      # 中止しても 8 リポジトリへの dispatch が走ってしまう。
       - name: dispatch tests
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
         run: |
