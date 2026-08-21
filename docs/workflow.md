@@ -111,6 +111,12 @@
 `ginseng-*` の CI は、手順本体を [.github/actions/ruby-check](../.github/actions/ruby-check/action.yml)（composite action）に置き、各 gem の `.github/workflows/test.yml` から呼ぶ。
 
 ```yaml
+on:
+  push:
+  schedule:
+    - cron: '25 0 * * 1'
+  workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -133,8 +139,27 @@ steps:
 
 ⚠ 2026-08-22 実測で、**8 リポジトリ中 6 つが既定 `write`**（`can_approve_pull_request_reviews` も `true`）で、**7 gem のどれにも `permissions:` と `persist-credentials:` が無かった**。
 
+### ⚠⚠ 週次 schedule は勝手に止まる
+
+> In a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days.
+> — [GitHub Docs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+
+⚠⚠ **`schedule:` の実行そのものは活動に数えられない。** 更新が止まった gem ほど止まりやすく、**いちばん必要な場面で監視が消える。**
+
+⚠ **「repository activity」の定義は文書化されていない。** したがって空コミット等の keepalive で延命する案は採らない。**定義が変われば黙って壊れる。**
+
+代わりに、[gem-watch](../.github/workflows/gem-watch.yml) で 2 つに分けて解く。
+
+1. **無効化の検知** — 各リポジトリの `GET /repos/{owner}/{repo}/actions/workflows` を見て、`state` が `active` でなければ job を落とす。⚠ `disabled_inactivity` は API の定義済みの値なので、「活動」の定義に依存しない
+2. **実行の担保** — 各 gem の `schedule:` に頼らず、`workflow_dispatch` で毎週起こす
+
+⚠⚠ **`gem-watch` 自身が 60 日で止まる可能性は残る。** `ginseng-style` は管理拠点で活動が続く前提に乗っている。**完全に塞ぐには外部の cron から `gem-watch` の最終実行を見るしかない**ので、そこはリスクとして受け入れている。
+
+⚠ 動かすには `GEM_WATCH_TOKEN`（fine-grained PAT・対象 8 リポジトリ・Actions: Read and write / Metadata: Read）を `ginseng-style` の secret に置く。`GITHUB_TOKEN` は他リポジトリを起動できない。
+
 - **週次の `schedule:` を必ず置く。** ⚠ push 契機だけだと、更新が止まった gem は永遠に緑のまま赤に気づけない。実例: `ginseng-postgres` の CI は 4 ヶ月赤のまま誰も気づかなかった
 - ⚠ **`schedule:` はデフォルトブランチでしか動かない。** feature ブランチに置いても発火しない
+- **`workflow_dispatch:` も必ず置く。** ⚠ 下記のとおり `schedule:` は勝手に止まるので、外から起こせる口が要る
 - ⚠ ginseng-style を壊すと全 gem の CI が同時に止まる。この gem の CI が緑であることを先に確認してから配る
 
 ## ginseng-* の変更手順

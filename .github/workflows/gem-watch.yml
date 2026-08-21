@@ -1,0 +1,79 @@
+name: gem-watch
+
+# ⚠⚠ public リポジトリの schedule: は 60 日間リポジトリ活動が無いと GitHub が
+# 自動で無効化する。⚠ 「活動」の定義は文書化されていないので、定義に依存する
+# keepalive では守れない。ここでは 2 つを分けて解く。
+#   1. 無効化の検知 — state が active でなければ落とす（disabled_inactivity は API の値）
+#   2. 実行の担保   — 各 gem の schedule: に頼らず workflow_dispatch で起こす
+# ⚠ この workflow 自身が 60 日で止まる可能性は残る。ginseng-style は管理拠点で
+#   活動が続く前提。詳細は docs/workflow.md。
+
+on:
+  schedule:
+    # ⚠ 各 gem の test（月曜 00:25 UTC）より後に置く
+    - cron: '25 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GEMS: >-
+    ginseng-style
+    ginseng-core
+    ginseng-fediverse
+    ginseng-web
+    ginseng-redis
+    ginseng-postgres
+    ginseng-piefed
+    ginseng-youtube
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check workflow states
+        env:
+          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+          bad=0
+          for r in $GEMS; do
+            if ! gh api "repos/pooza/$r/actions/workflows" \
+                --jq '.workflows[] | "\(.state)\t\(.name)\t\(.path)"' > states.tsv; then
+              echo "::error::pooza/$r の workflow 一覧を取得できない"
+              bad=1
+              continue
+            fi
+            while IFS=$'\t' read -r state name path; do
+              if [ "$state" = active ]; then
+                echo "ok       pooza/$r  $name"
+              else
+                echo "::error::pooza/$r $name ($path) = $state"
+                bad=1
+              fi
+            done < states.tsv
+          done
+          exit $bad
+
+      # ⚠ 状態が赤でも起動は試みる。無効化されていない gem のテストまで止めない。
+      # ⚠⚠ always() ではなく !cancelled()。always() はキャンセル時も true を返すので、
+      # 中止しても 8 リポジトリへの dispatch が走ってしまう。
+      - name: dispatch tests
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+          bad=0
+          for r in $GEMS; do
+            if gh workflow run test.yml -R "pooza/$r"; then
+              echo "dispatched  pooza/$r"
+            else
+              # ⚠⚠ 起動できなければ「実行の担保」が成立していない。残りは続けるが、
+              # 最後に必ず落とす。warning にすると全部失敗しても緑のままになる。
+              echo "::error::pooza/$r の test.yml を起動できない（workflow_dispatch: が無い / トークンの権限不足）"
+              bad=1
+            fi
+          done
+          exit $bad
