@@ -108,12 +108,27 @@
 `ginseng-*` の CI は、手順本体を [.github/actions/ruby-check](../.github/actions/ruby-check/action.yml)（composite action）に置き、各 gem の `.github/workflows/test.yml` から呼ぶ。
 
 ```yaml
+permissions:
+  contents: read
+
 steps:
   - uses: actions/checkout@v5
+    with:
+      persist-credentials: false
   - uses: pooza/ginseng-style/.github/actions/ruby-check@main
 ```
 
 ⚠ **`matrix` / `services` / `schedule` は呼び出し側に残す。** Ruby の対応版・必要なミドルウェアは gem ごとに違う。共通化するのは手順だけ。
+
+### ⚠⚠ 呼び出し側で権限を絞る
+
+手順本体は `@main` 参照なので、**`ginseng-style` の `main` に入った変更が、各リポジトリの `GITHUB_TOKEN` を持って動く。** 止まるだけでなく任意のコードが走る側面がある。
+
+- **`permissions: contents: read` を workflow に必ず置く。** ⚠ リポジトリ既定に頼らない
+- **`actions/checkout` に `persist-credentials: false` を置く。** ⚠ 既定では認証情報がワークツリーの `git config` に残り、後続のステップから使える。依存 gem は public な `github:` 参照なので、消しても `bundle install` に影響しない
+- ⚠⚠ **リポジトリ設定側の既定も `read` に落とす。** Settings → Actions → General → Workflow permissions。ファイルの `permissions:` は**その workflow にしか効かない**ので、両方要る
+
+⚠ 2026-08-22 実測で、**8 リポジトリ中 6 つが既定 `write`**（`can_approve_pull_request_reviews` も `true`）で、**7 gem のどれにも `permissions:` と `persist-credentials:` が無かった**。
 
 - **週次の `schedule:` を必ず置く。** ⚠ push 契機だけだと、更新が止まった gem は永遠に緑のまま赤に気づけない。実例: `ginseng-postgres` の CI は 4 ヶ月赤のまま誰も気づかなかった
 - ⚠ **`schedule:` はデフォルトブランチでしか動かない。** feature ブランチに置いても発火しない
