@@ -31,9 +31,13 @@
 
 ## ブランチ
 
-- `main`（リリース）と `develop`（開発）を持つ
-- 作業は feature ブランチを切る。命名は `fix/<issue>-<slug>` / `feat/<issue>-<slug>`
+⚠ **gem 側とアプリ側で違う。** 2026-08-22 の実測に合わせている。
+
+- **gem 側（`ginseng-*`）は `main` だけ持つ。** feature ブランチを切って `main` へ直接 PR を出す。⚠ **`develop` は作らない**
+- **アプリ側は `main`（リリース）と `develop`（開発）を持つ**
+- 作業は feature ブランチを切る。命名は `fix/<issue>-<slug>` / `feat/<issue>-<slug>` / `docs/<issue>-<slug>`
 - ⚠ `gh pr create` は `--base` を必ず明示する。省略すると default branch が宛先になり、**フォークでは upstream に向く**
+- ⚠⚠ **`develop` があっても、`main` より遅れているならそれは現行ではない。** 死んだ `develop` の CI 定義を現行と誤読して、composite action に不要な入力を足した実例がある（[pooza/ginseng-core#521](https://github.com/pooza/ginseng-core/pull/521) へ誤爆 → #5 → #7 で取り消し）。**参照する前に `main` との差を見る**
 
 ## マイルストーン
 
