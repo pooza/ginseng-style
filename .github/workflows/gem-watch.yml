@@ -77,3 +77,66 @@ jobs:
             fi
           done
           exit $bad
+
+  # ⚠⚠ #53 で利用側を `tag:` 固定にした。固定は「勝手に赤くなる」を止める代わりに
+  # 「**いつまでも古いまま**」を招く。⚠ これは仮定ではない — `ginseng-core` は
+  # 最後のタグが 2026-06-10 で止まったまま 88 コミット進んでいる。固定した以上、
+  # 陳腐化は**別途見張らないと誰も気付かない**。
+  pins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check pinned ginseng-style
+        env:
+          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          latest=$(gh api repos/pooza/ginseng-style/tags --paginate --jq '.[].name' \
+                     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [ -z "$latest" ]; then
+            echo "::error::pooza/ginseng-style にタグが無い。release.yml が動いていない"
+            exit 1
+          fi
+          echo "最新 = $latest"
+
+          raw() { gh api -H 'Accept: application/vnd.github.raw' "repos/pooza/$1/contents/$2" 2>/dev/null; }
+
+          bad=0
+          stale=0
+          for r in $GEMS; do
+            [ "$r" = ginseng-style ] && continue
+
+            # Gemfile 側（設定そのもの）
+            ref=$(raw "$r" Gemfile | sed -n "s/.*ginseng-style.*tag: *['\"]\([^'\"]*\)['\"].*/\1/p" | head -1)
+            if [ -z "$ref" ]; then
+              # ⚠⚠ 未固定は「設計が効いていない」ので落とす。古いのとは格が違う。
+              echo "::error::pooza/$r の Gemfile が ginseng-style を tag: で固定していない"
+              bad=1
+            elif [ "$ref" != "$latest" ]; then
+              # ⚠ 古いだけなら落とさない。配っている最中は必ず古い期間があり、
+              #   そこで赤くすると「赤は無視するもの」になる（それが一番高くつく）。
+              echo "::warning::pooza/$r の Gemfile は $ref（最新は $latest）"
+              stale=$((stale + 1))
+            fi
+
+            # workflow 側（共有 composite action。#32）
+            ref=$(raw "$r" .github/workflows/test.yml \
+                    | sed -n 's|.*pooza/ginseng-style/.github/actions/ruby-check@\([^ ]*\).*|\1|p' | head -1)
+            if [ -z "$ref" ]; then
+              echo "::error::pooza/$r の test.yml が ruby-check を参照していない"
+              bad=1
+            elif [ "$ref" = main ]; then
+              echo "::error::pooza/$r の test.yml が ruby-check を @main で参照している"
+              bad=1
+            elif [ "$ref" != "$latest" ]; then
+              echo "::warning::pooza/$r の ruby-check は @$ref（最新は $latest）"
+              stale=$((stale + 1))
+            fi
+          done
+
+          # ⚠ warning は流れて消える。ジョブサマリに残して、週次で一覧が読める形にする。
+          echo "## ginseng-style の固定状況" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "最新タグ: \`$latest\` / 古い参照: $stale 件" >> "$GITHUB_STEP_SUMMARY"
+
+          exit $bad
