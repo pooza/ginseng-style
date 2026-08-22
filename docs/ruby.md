@@ -122,6 +122,21 @@ def setup
 end
 ```
 
+### ⚠⚠ `assert_includes` は `include?` を呼ぶ — `member?` の上書きは通らない
+
+`Set` では `include?` / `member?` / `===` は別名だが、**片方だけを上書きしたクラスでは別物になる**。⚠ `assert_includes` が呼ぶのは `include?` なので、`member?` を上書きしたクラスでは**上書きを一度も通らないテスト**になる（実例: [pooza/ginseng-fediverse#260](https://github.com/pooza/ginseng-fediverse/issues/260)）。
+
+⚠ ここで **cop 同士が反対を要求する**。`assert(container.member?(x))` は `Minitest/AssertIncludes` が `assert_includes` を勧め、`assert_equal(true, ...)` は `Minitest/AssertTruthy` が `assert` を勧める。
+
+```ruby
+# ✅ 局所変数に受けると、どちらの cop の対象からも外れる
+member = container.member?(word)
+
+assert(member)
+```
+
+⚠ **上流には持ち込まない。** cop はどちらも一般には正しく、噛み合わないのはこちらの設計（片方だけの上書き）が理由。
+
 ### ⚠ 一見 DB 無関係なクラスが DB を要求することがある
 
 初期化チェーンを辿ると DB に着くことがある。モロヘイヤの実例:
