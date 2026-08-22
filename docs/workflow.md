@@ -124,14 +124,35 @@ steps:
   - uses: actions/checkout@v5
     with:
       persist-credentials: false
-  - uses: pooza/ginseng-style/.github/actions/ruby-check@main
+  # ⚠⚠ @main ではなく版で固定する。理由は下の「参照は必ず版で固定する」。
+  - uses: pooza/ginseng-style/.github/actions/ruby-check@v1.1.0
 ```
 
 ⚠ **`matrix` / `services` / `schedule` は呼び出し側に残す。** Ruby の対応版・必要なミドルウェアは gem ごとに違う。共通化するのは手順だけ。
 
+### ⚠⚠ 参照は必ず版で固定する
+
+`ginseng-style` は利用側から **2 経路**で参照される。⚠⚠ **どちらも `@main` / `branch: 'main'` にしないこと。**
+
+| 経路 | 何が入ってくるか | 書き方 |
+| --- | --- | --- |
+| `.github/workflows/test.yml` | CI の手順本体（composite action） | `pooza/ginseng-style/.github/actions/ruby-check@v1.1.0` |
+| `Gemfile` | RuboCop の設定と rubocop 本体・プラグイン | `gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.0', require: false` |
+
+**固定しないと、利用側が 1 行もコミットしていないのに次の push で CI が赤くなる。** `config/rubocop.yml` に cop を足した瞬間、`NewCops: enable` があるので rubocop 本体の更新でも同じことが起きる。⚠ 「1 リポジトリで試してから配る」という下記の手順は、**配る前に全リポジトリへ届いてしまう**ので前提から崩れていた。
+
+⚠⚠ **`Gemfile.lock` は固定の代わりにならない。** gem 側は `Gemfile.lock` を `.gitignore` していて、**CI のチェックアウトには lock がそもそも存在しない**。`bundle install` は毎回 `main` の HEAD を解決する。実測（2026-08-23、`ginseng-style` の main = `956e0a68e7`）:
+
+| | 刺さっていた版 | main から |
+| --- | --- | --- |
+| gem 側 7 本の**手元** | `9422f76dba` ほか（2026-08-19） | 45〜48 遅れ |
+| gem 側 7 本の **CI** | `main` | 0 |
+
+🔴 **手元と CI が 48 コミット違う状態で「緑」と言っていた。** 実害の例: `ginseng-core` の手元だけ `Minitest/AssertPathExists` が出て、CI は同じコミットで緑だった（[#53](https://github.com/pooza/ginseng-style/issues/53)）。
+
 ### ⚠⚠ 呼び出し側で権限を絞る
 
-手順本体は `@main` 参照なので、**`ginseng-style` の `main` に入った変更が、各リポジトリの `GITHUB_TOKEN` を持って動く。** 止まるだけでなく任意のコードが走る側面がある。
+手順本体は他リポジトリの composite action なので、**`ginseng-style` に入った変更が、各リポジトリの `GITHUB_TOKEN` を持って動く。** 止まるだけでなく任意のコードが走る側面がある。⚠⚠ **版で固定してもこの性質は消えない**（固定は「いつ変わるか」を選べるようにするだけで、「何が動くか」は変わらない）。権限を絞るのは固定とは別に必ずやる。
 
 - **`permissions: contents: read` を workflow に必ず置く。** ⚠ リポジトリ既定に頼らない
 - **`actions/checkout` に `persist-credentials: false` を置く。** ⚠ 既定では認証情報がワークツリーの `git config` に残り、後続のステップから使える。依存 gem は public な `github:` 参照なので、消しても `bundle install` に影響しない
@@ -178,6 +199,8 @@ steps:
 ### ⚠ ピン留めのばらけを放置しない
 
 `Gemfile.lock` は git 参照のリビジョンを固定するので、**リポジトリごとに違う版が刺さったまま何ヶ月も進む**。security 修正が一部にしか届いていない状態になりやすい。定期的に横断で棚卸しする。
+
+⚠ **`ginseng-style` は別扱い**（上記「参照は必ず版で固定する」）。刺さっている版は `Gemfile` の `tag:` に書いてあり、古いものは週次の [gem-watch](../.github/workflows/gem-watch.yml) が出す。⚠⚠ **`ginseng-core` などライブラリ本体は、いまも `Gemfile.lock` 頼りのまま**なので、下の棚卸しが要る。
 
 ```sh
 for d in ~/repos/*/; do

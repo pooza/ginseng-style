@@ -1,0 +1,69 @@
+name: release
+
+# ⚠⚠ 利用側は `tag:` で固定する（#53 / #32）。**固定した先にタグが打たれなければ、
+# 利用側は永遠に古い設定のままになる。** これは仮定ではなく実測で、`ginseng-core`
+# では最後のタグ v1.15.26 が 2026-06-10、以降 88 コミット・`bump version` は 20 回
+# 以上あるのにタグはひとつも増えていない。⚠ **手で打つ運用は死ぬ。**
+#
+# そこで `config/lib.yaml` の `package.version` をタグの正本にし、main に載った
+# 時点で `v<version>` を自動で作る。運用者がやるのは version を上げることだけ。
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# ⚠⚠ タグを作るので書き込みが要る。このリポジトリの既定 workflow 権限は read
+# なので、**ここでの宣言が効くかどうかがこの workflow の実測点でもある**。
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # ⚠ 「配布物を変えたのに version を上げていない」の判定に、push 前後の
+          # 差分が要る。浅いチェックアウトでは github.event.before に届かない。
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: tag if version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          version=$(ruby -ryaml -e "puts YAML.load_file('config/lib.yaml')['package']['version']")
+          # ⚠ 壊れた version でタグを作ると、消せない名前が残る。形を先に見る。
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::config/lib.yaml の package.version が semver ではない: '$version'"
+            exit 1
+          fi
+          tag="v$version"
+
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag は既にある"
+
+            # ⚠⚠ 既にあるのに配布物が変わっていたら、**利用側には永久に届かない
+            # 変更**を main に入れたということ。tag は動かさず、ここで落として気付く。
+            # ⚠ gemspec の spec.files が配るのは config/ docs/ lib/ の 3 つ。
+            if [ -n "${BEFORE:-}" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] \
+               && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- config docs lib || true)
+              if [ -n "$changed" ]; then
+                echo "::error::配布物を変えたのに $tag のまま。config/lib.yaml の package.version を上げること"
+                printf '%s\n' "$changed" | sed 's/^/  /'
+                exit 1
+              fi
+            fi
+            exit 0
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$tag" \
+            -f sha="$GITHUB_SHA" > /dev/null
+          echo "::notice::$tag を作成した（$GITHUB_SHA）"
