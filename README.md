@@ -12,9 +12,24 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 ```ruby
 group :development do
-  gem 'ginseng-style', github: 'pooza/ginseng-style', require: false
+  # ⚠⚠ tag: を必ず付ける。理由は下の「⚠⚠ 版で固定する」。
+  gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.0', require: false
 end
 ```
+
+### ⚠⚠ 版で固定する
+
+**`tag:` を付けずに（＝ `main` を追って）参照すると、利用側が 1 行もコミットしていないのに、こちらが cop を足した次の push で CI が赤くなる。** `NewCops: enable` があるので、rubocop 本体の更新でも同じことが起きる。
+
+⚠⚠ **`Gemfile.lock` は代わりにならない。** gem 側は `Gemfile.lock` を `.gitignore` しているので、**CI のチェックアウトには lock が存在せず**、毎回 `main` の HEAD が解決される。実測（2026-08-23）では、gem 側 7 本の手元と CI で **45〜48 コミット違う `ginseng-style`** を見ていた（[#53](https://github.com/pooza/ginseng-style/issues/53)）。
+
+CI の composite action を使っている場合は、**そちらも同じ版に揃える**。
+
+```yaml
+- uses: pooza/ginseng-style/.github/actions/ruby-check@v1.1.0
+```
+
+版を上げるのは `Gemfile` と `test.yml` の 2 行を書き換える**明示的な操作**にする。⚠ **古い版で止まっているリポジトリは週次の [gem-watch](.github/workflows/gem-watch.yml) が知らせる**ので、放置には気付ける。
 
 `.rubocop.yml` は差分だけにする。
 
@@ -84,3 +99,5 @@ RuboCop で機械的に守れないものはこちら。
 ## 変更するとき
 
 ⚠ **`config/rubocop.yml` の変更は inherit している全プロジェクトに波及する。** 1 リポジトリで通してから配ること。手順は [docs/CLAUDE.md](docs/CLAUDE.md) にある。
+
+⚠⚠ **`main` にマージしただけでは誰にも届かない。** 利用側はタグで固定しているので、`config/lib.yaml` の `package.version` を上げ（タグは [release.yml](.github/workflows/release.yml) が自動で打つ）、**各リポジトリの `tag:` を上げる PR を出すところまでが手順**。
