@@ -37,6 +37,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          # ⚠⚠ workflow_dispatch は任意のブランチで回せる。feature ブランチで回すと
+          # GITHUB_SHA がそこを指し、**未マージのコミットに公開タグが付く**（Codex P1）。
+          # ⚠ タグは一度公開すると消しにくい（利用側が既に刺している可能性がある）。
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::release は main でのみ動かす（いま: $GITHUB_REF）"
+            exit 1
+          fi
+
           version=$(ruby -ryaml -e "puts YAML.load_file('config/lib.yaml')['package']['version']")
           # ⚠ 壊れた version でタグを作ると、消せない名前が残る。形を先に見る。
           if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -50,10 +58,15 @@ jobs:
 
             # ⚠⚠ 既にあるのに配布物が変わっていたら、**利用側には永久に届かない
             # 変更**を main に入れたということ。tag は動かさず、ここで落として気付く。
-            # ⚠ gemspec の spec.files が配るのは config/ docs/ lib/ の 3 つ。
+            #
+            # ⚠ 配布物は 2 系統ある。**片方だけ見ると漏れる**（Codex P2）。
+            #   1. gem として配るもの — gemspec の spec.files（config/ docs/ lib/）
+            #   2. タグ経由で参照されるもの — .github/actions/ruby-check（#32）
+            # ⚠⚠ 2 を落とすと、利用側は ruby-check@vX.Y.Z を刺しているので永久に
+            #   受け取れないうえ、**新しいタグが無いので gem-watch も気付けない**。
             if [ -n "${BEFORE:-}" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] \
                && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-              changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- config docs lib || true)
+              changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- config docs lib .github/actions || true)
               if [ -n "$changed" ]; then
                 echo "::error::配布物を変えたのに $tag のまま。config/lib.yaml の package.version を上げること"
                 printf '%s\n' "$changed" | sed 's/^/  /'
