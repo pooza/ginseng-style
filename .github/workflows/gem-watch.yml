@@ -101,6 +101,10 @@ jobs:
 
           raw() { gh api -H 'Accept: application/vnd.github.raw' "repos/pooza/$1/contents/$2" 2>/dev/null; }
 
+          # ⚠⚠ 「固定されている」＝ vX.Y.Z の形であること。@main だけを弾いても、
+          # @develop のような別の可変 ref が warning で素通りする（Codex P2）。
+          pinned() { printf '%s' "$1" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; }
+
           bad=0
           stale=0
           for r in $GEMS; do
@@ -108,9 +112,9 @@ jobs:
 
             # Gemfile 側（設定そのもの）
             ref=$(raw "$r" Gemfile | sed -n "s/.*ginseng-style.*tag: *['\"]\([^'\"]*\)['\"].*/\1/p" | head -1)
-            if [ -z "$ref" ]; then
+            if ! pinned "$ref"; then
               # ⚠⚠ 未固定は「設計が効いていない」ので落とす。古いのとは格が違う。
-              echo "::error::pooza/$r の Gemfile が ginseng-style を tag: で固定していない"
+              echo "::error::pooza/$r の Gemfile が ginseng-style を vX.Y.Z のタグで固定していない（\"${ref:-なし}\"）"
               bad=1
             elif [ "$ref" != "$latest" ]; then
               # ⚠ 古いだけなら落とさない。配っている最中は必ず古い期間があり、
@@ -125,8 +129,9 @@ jobs:
             if [ -z "$ref" ]; then
               echo "::error::pooza/$r の test.yml が ruby-check を参照していない"
               bad=1
-            elif [ "$ref" = main ]; then
-              echo "::error::pooza/$r の test.yml が ruby-check を @main で参照している"
+            elif ! pinned "$ref"; then
+              # ⚠ @main / @develop / 任意のブランチ。どれも固定されていない。
+              echo "::error::pooza/$r の test.yml が ruby-check を @$ref で参照している（vX.Y.Z ではない）"
               bad=1
             elif [ "$ref" != "$latest" ]; then
               echo "::warning::pooza/$r の ruby-check は @$ref（最新は $latest）"
