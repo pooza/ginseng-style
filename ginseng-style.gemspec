@@ -14,7 +14,12 @@ Gem::Specification.new do |spec|
   spec.metadata['rubygems_mfa_required'] = 'true'
   spec.files = Dir['config/**/*', 'docs/**/*', 'lib/**/*', 'LICENSE.txt', 'README.md']
   spec.require_paths = ['lib']
-  spec.required_ruby_version = '>=3.4'
+  # ⚠⚠ **ここは「揃えたい版」ではなく「利用側の最低版」(#63)。** この gem は
+  # 規約を配る側なので、利用側の版の**和集合**を飲まないと入らない。3.4 へ
+  # 上げた v1.1.3 で、3.3 を残している ginseng-core の CI が
+  # `ginseng-style-1.1.3 requires ruby version >= 3.4` で落ちた。
+  # ⚠ CI の matrix / TargetRubyVersion とは決め方が違う。
+  spec.required_ruby_version = '>=3.3'
 
   # ⚠ linter 本体をこの gem が抱える。利用側の Gemfile から rubocop 系の
   # development_dependency を消せるようにするのが目的。
