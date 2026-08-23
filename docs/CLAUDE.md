@@ -17,6 +17,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
    - ⚠⚠ **このリポジトリは [workflow.md](workflow.md) の「着手時バンプ」の例外。** ここでは `release.yml` が version からタグを打つので**バンプ＝リリース**であり、**マイルストーンを埋め切ってから**上げる
 3. `main` にマージする。**タグ `v<version>` は [release.yml](../.github/workflows/release.yml) が自動で打つ**。⚠ 手で打たない
 4. **利用側 1 リポジトリで試す**。`Gemfile` のタグを新しい版へ上げ、`bundle install && bundle exec rubocop` が緑になることを確認する。⚠ `NewCops: enable` と利用側の `TargetRubyVersion` の組み合わせで、いま緑のものが赤くなりうる
+   - ⚠⚠ **手元で緑になっても終わりではない。CI が回るまでが手順** (#63)。手元の Ruby は 1 版だけで、**matrix を持っているのは CI だけ**。`required_ruby_version` を 3.4 へ上げた `v1.1.3` は、手元（4.0.6）では緑のまま **3.3 を残した利用側の CI で落ちた**
 5. 問題なければ残りへ配る。1 リポジトリ 1 PR、`rake lint` が緑になったところまで。⚠ **`Gemfile` の `tag:` と `test.yml` の `ruby-check@` を同じ版に揃える**。⚠⚠ **`--show-cops` と `--list-target-files` の差分がどちらもゼロであることを確認する**（[README](../README.md) の `Include` / `Exclude` の置換）
 6. 破壊的な変更（既存コードの書き換えを要求するもの）は、配る前に Issue で予告する
 
@@ -62,6 +63,13 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 - ⚠⚠ **`ginseng-core` に依存させないこと。** ginseng-core 側もこの gem の規約に従う側なので、依存させると循環する
 - rubocop 本体とプラグインをこの gem の `add_dependency` に持つ。利用側の Gemfile から rubocop 系を消せるようにするのが目的
 - バージョンの正本は [config/lib.yaml](../config/lib.yaml) の `package.version`
+- ⚠⚠ **Ruby の版は 3 箇所あり、決め方が違う (#61 / #63)。同じ数字で揃えようとしない。**
+
+| | 意味 | 決め方 |
+| --- | --- | --- |
+| CI の matrix | どの版でテストするか | 揃えたい版 |
+| `TargetRubyVersion` | どの版向けに lint するか | 揃えたい版（⚠ 利用側は上書きできる） |
+| 🔴 `required_ruby_version` | **どの版に入るか** | ⚠⚠ **利用側の最低版**。この gem は配る側なので、**利用側の版の和集合**を飲む |
 
 ## 規約そのものについて
 
