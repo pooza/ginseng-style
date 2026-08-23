@@ -14,6 +14,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 1. このリポジトリで `bundle exec rubocop` を通す
 2. **`config/lib.yaml` の `package.version` を上げる。** ⚠⚠ **忘れると `release` ワークフローが赤で教える**（配布物を変えたのに既存タグのまま、という状態を検出する）
+   - ⚠⚠ **このリポジトリは [workflow.md](workflow.md) の「着手時バンプ」の例外。** ここでは `release.yml` が version からタグを打つので**バンプ＝リリース**であり、**マイルストーンを埋め切ってから**上げる
 3. `main` にマージする。**タグ `v<version>` は [release.yml](../.github/workflows/release.yml) が自動で打つ**。⚠ 手で打たない
 4. **利用側 1 リポジトリで試す**。`Gemfile` のタグを新しい版へ上げ、`bundle install && bundle exec rubocop` が緑になることを確認する。⚠ `NewCops: enable` と利用側の `TargetRubyVersion` の組み合わせで、いま緑のものが赤くなりうる
 5. 問題なければ残りへ配る。1 リポジトリ 1 PR、`rake lint` が緑になったところまで。⚠ **`Gemfile` の `tag:` と `test.yml` の `ruby-check@` を同じ版に揃える**。⚠⚠ **`--show-cops` と `--list-target-files` の差分がどちらもゼロであることを確認する**（[README](../README.md) の `Include` / `Exclude` の置換）
