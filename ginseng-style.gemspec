@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
   spec.metadata['rubygems_mfa_required'] = 'true'
   spec.files = Dir['config/**/*', 'docs/**/*', 'lib/**/*', 'LICENSE.txt', 'README.md']
   spec.require_paths = ['lib']
-  spec.required_ruby_version = '>=3.3'
+  spec.required_ruby_version = '>=3.4'
 
   # ⚠ linter 本体をこの gem が抱える。利用側の Gemfile から rubocop 系の
   # development_dependency を消せるようにするのが目的。

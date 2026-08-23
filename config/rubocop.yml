@@ -42,8 +42,10 @@ AllCops:
     - '**/Rakefile'
     - '**/config.ru'
   NewCops: enable
-  # ⚠ ここは**下限**。各プロジェクトが自分の値で上書きすること。
-  TargetRubyVersion: 3.3
+  # ⚠ ここは**揃えたい版**。各プロジェクトが自分の値で上書きすること。
+  # ⚠⚠ **下限ではない。** これより低い版が要るリポジトリは自分で下げる
+  # （`ginseng-core` は 3.3 のまま。pooza/ginseng-style#61）。
+  TargetRubyVersion: 3.4
 Layout/ArgumentAlignment:
   EnforcedStyle: with_fixed_indentation
 Layout/ArrayAlignment:
