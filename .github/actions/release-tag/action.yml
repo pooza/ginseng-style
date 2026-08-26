@@ -1,0 +1,108 @@
+name: release-tag
+description: config/lib.yaml の package.version をタグの正本にする（打つ／据え置きを検出する）
+
+# ⚠⚠ 利用側は `tag:` で固定する（#53 / #32）。**固定した先にタグが打たれなければ、
+# 利用側は永遠に古いままになる。** これは仮定ではなく実測で、2026-08-27 時点で
+# `ginseng-core` は version 1.22.0 に対しタグが v1.20.0（security 修正 2 件が未出荷）、
+# `ginseng-web` は 3 版、`ginseng-redis` は 2 版、`ginseng-piefed` はタグが 1 本も無い。
+# ⚠ **手で打つ運用は死ぬ。** 手順の正本をここ 1 箇所に置く（#65）。
+#
+# ⚠⚠ **タグを打つ引き金はリポジトリで違う。** 揃えようとしないこと。
+#   - `ginseng-style`（mode: auto）— version からタグを打つので **バンプ＝リリース**。
+#     着手時バンプをしない（docs/workflow.md の例外規定）
+#   - gem 側 7 本（mode: manual）— **着手時バンプ**をするので、main には「まだタグの
+#     無い version」が載っているのが正常。⚠ ここで push を引き金にすると、
+#     **マイルストーンの 1 本目の PR が載った時点でタグが打たれる**（＝ fediverse
+#     v1.8.29 の事故と同じ形）。出荷の合図は workflow_dispatch にする
+
+inputs:
+  mode:
+    description: |
+      auto   = push でも version が新しければ打つ（バンプ＝リリース。ginseng-style 自身）
+      manual = workflow_dispatch でだけ打つ（着手時バンプ。gem 側 7 本）
+    required: false
+    default: manual
+  paths:
+    description: |
+      「配布物」とみなすパス（空白区切り）。⚠⚠ 2 系統ある。**片方だけ見ると漏れる**。
+        1. gem として配るもの — gemspec の spec.files（config/ docs/ lib/）
+        2. タグ経由で参照されるもの — .github/actions/*（#32 の ruby-check など）
+      ⚠ 2 を落とすと、利用側は `@vX.Y.Z` を刺しているので永久に受け取れず、
+      **新しいタグが無いので gem-watch も気付けない**。
+    required: false
+    default: config docs lib .github/actions
+  token:
+    description: "タグの作成に使うトークン（`${{ github.token }}` でよい。contents: write が要る）"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: tag from config/lib.yaml
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        MODE: ${{ inputs.mode }}
+        PATHS: ${{ inputs.paths }}
+      run: |
+        set -euo pipefail
+
+        case "$MODE" in
+          auto|manual) ;;
+          *) echo "::error::mode は auto か manual（いま: '$MODE'）"; exit 1 ;;
+        esac
+
+        # ⚠⚠ workflow_dispatch は任意のブランチで回せる。feature ブランチで回すと
+        # GITHUB_SHA がそこを指し、**未マージのコミットに公開タグが付く**（Codex P1）。
+        # ⚠ タグは一度公開すると消しにくい（利用側が既に刺している可能性がある）。
+        if [ "$GITHUB_REF" != refs/heads/main ]; then
+          echo "::error::release は main でのみ動かす（いま: $GITHUB_REF）"
+          exit 1
+        fi
+
+        version=$(ruby -ryaml -e "puts YAML.load_file('config/lib.yaml')['package']['version']")
+        # ⚠ 壊れた version でタグを作ると、消せない名前が残る。形を先に見る。
+        if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+          echo "::error::config/lib.yaml の package.version が semver ではない: '$version'"
+          exit 1
+        fi
+        tag="v$version"
+
+        if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+          # ⚠⚠ 既にあるのに配布物が変わっていたら、**利用側には永久に届かない変更**を
+          # main に入れたということ。tag は動かさず、ここで落として気付く。
+          #
+          # ⚠⚠ 比較の基点は **タグそのもの**であって、この push の前ではない。
+          # `github.event.before` を使うと **1 push 分しか見ない**ので、「配布物を変えた
+          # push」と「version を上げないまま重ねた push」が分かれていると素通りする。
+          # ⚠ workflow_dispatch には before が無い、という穴も同時に塞がる。
+          if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag はリモートにあるが手元に無い。checkout に fetch-depth: 0 が要る"
+            exit 1
+          fi
+          # shellcheck disable=SC2086
+          changed=$(git diff --name-only "refs/tags/$tag" "$GITHUB_SHA" -- $PATHS || true)
+          if [ -n "$changed" ]; then
+            echo "::error::配布物を変えたのに $tag のまま。config/lib.yaml の package.version を上げること"
+            printf '%s\n' "$changed" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "::notice::$tag は既にある（配布物の差分なし）"
+          exit 0
+        fi
+
+        # ⚠ manual での push は「着手時バンプで version が先行している」正常な状態。
+        # ⚠⚠ ここで打たないので、**押し忘れは別途見張らないと誰も気付かない**
+        # （ginseng-style の gem-watch.yml の releases ジョブが週次で一覧を出す）。
+        if [ "$MODE" = manual ] && [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then
+          echo "::notice::$tag はまだ無い（出荷は workflow_dispatch。マイルストーンを埋め切ってから）"
+          exit 0
+        fi
+
+        # ⚠ 形は lightweight に統一した（8 本中 7 本が元からそう。#65）。
+        # ⚠⚠ 既存の annotated なタグ（ginseng-fediverse）は動かさない。利用側が
+        # 既に刺しているので、形を揃えるために打ち直してはいけない。
+        gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+          -f ref="refs/tags/$tag" \
+          -f sha="$GITHUB_SHA" > /dev/null
+        echo "::notice::$tag を作成した（$GITHUB_SHA）"

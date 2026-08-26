@@ -27,7 +27,9 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 版で固定すると「勝手に赤くなる」は止まるが、代わりに **配り忘れが永久に残る**。⚠ **これは仮定ではない** — `ginseng-core` は最後のタグ `v1.15.26` が **2026-06-10** で、以降 **88 コミット**・`bump version` は 20 回以上あるのにタグがひとつも増えていない。**手で打つ運用は死ぬ。**
 
-- このリポジトリのタグは [release.yml](../.github/workflows/release.yml) が自動で打つ（`config/lib.yaml` が正本）
+- タグは [release.yml](../.github/workflows/release.yml) が打つ（`config/lib.yaml` の `package.version` が正本）。⚠⚠ **手順本体は [release-tag](../.github/actions/release-tag/action.yml) にあり、gem 側 7 本も同じものを `@vX.Y.Z` で呼ぶ**（#65）
+  - ⚠⚠ **引き金はリポジトリで違う。** このリポジトリは `mode: auto`（push＝出荷）、**gem 側 7 本は `mode: manual`（`workflow_dispatch` を人が押す）**。着手時バンプをするかどうかで決まる（[workflow.md](workflow.md) の「タグを手で打たない」）
+  - 🔴 **押し忘れは [gem-watch](../.github/workflows/gem-watch.yml) の `releases` ジョブが週次で一覧に出す**（赤にはしない）
 - 古い版で止まっている利用側は、[gem-watch](../.github/workflows/gem-watch.yml) の `pins` ジョブが週次で出す
 - ⚠ **未固定（`@main` / `branch: 'main'`）は落とす。古いだけなら落とさない** — 配っている最中は必ず古い期間があり、そこで赤くすると「赤は無視するもの」になる
 

@@ -110,8 +110,28 @@
 - **順序は「Issue を消化 → リリース前レビュー → タグ」。** ⚠ バンプは着手時に済ませてある（上記「マイルストーン」）
 - ⚠⚠ **バンプを出荷の合図と読まない。** 上の事故も、正確には「バンプが早かった」のではなく、**緊急修正 PR に混ざったバンプを見てタグを打った**こと。⚠ 個別の修正 PR にバンプを混ぜなければ、この誤読は起きにくい
 - ⚠ **急ぎの利用側は `branch: 'main'` 参照や `bundle update` で取り込めるので、タグは待たせない理由にならない。** 「早く使わせたいから先に打つ」は不要
-- ⚠ **タグの形を揃える。** annotated と lightweight が混在すると、`git describe` や一覧の見え方が版によって変わる
+- ⚠ **タグの形は lightweight に統一した**（#65）。annotated と lightweight が混在すると、`git describe` や一覧の見え方が版によって変わる。⚠⚠ **既にある annotated なタグ（`ginseng-fediverse`）は打ち直さない** — 利用側が既に刺している
 - ⚠⚠ **これは「マイルストーン＝版」のリポジトリの話。** マイルストーンがマイナー系列で、配布物を変えるたびにパッチ版が出るリポジトリには当てはまらない（上記「マイルストーン」の例外）
+
+### ⚠⚠ タグを手で打たない — 引き金はリポジトリで違う
+
+🔴 **手で打つ運用は死ぬ。** ⚠ これは仮定ではない — 2026-08-27 の実測で、**4 gem に計 8 版ぶんの出荷が滞留**していた（`ginseng-core` は version 1.22.0 に対しタグが `v1.20.0` で **security 修正 2 件が未出荷**、`ginseng-web` は 3 版、`ginseng-redis` は 2 版、`ginseng-piefed` はタグが 1 本も無し）。
+
+手順本体は [.github/actions/release-tag](../.github/actions/release-tag/action.yml)（composite action）に置き、各リポジトリの `.github/workflows/release.yml` から呼ぶ（[CI](#ci) の `ruby-check` と同じ形）。**タグの正本は `config/lib.yaml` の `package.version`**（8 本すべてこの形。gemspec の `spec.version` もここを読む）。
+
+⚠⚠ **引き金は 2 通りある。揃えようとしないこと。** 着手時バンプをするかどうかで決まる。
+
+| | `mode` | タグを打つ引き金 | 着手時バンプ |
+| --- | --- | --- | --- |
+| `ginseng-style` | `auto` | **`main` への push**（バンプ＝リリース） | しない |
+| gem 側 7 本 | `manual` | 🔴 **`workflow_dispatch`**（人が押す） | する |
+
+- ⚠⚠ **gem 側で push を引き金にしてはいけない。** 着手時バンプをする以上、`main` には「まだタグの無い version」が載っているのが正常で、そこで打つと**マイルストーンの 1 本目の PR が載った時点で出荷される**（＝ 上の `v1.8.29` の事故と同じ形）
+- **押すのは「Issue を消化 → リリース前レビュー」の後。** ⚠ `gh workflow run release.yml -R pooza/<gem>` でよい
+- ⚠ **どちらの mode でも、push のたびに「配布物を変えたのに `v<version>` のまま」を検査する。** 引っ掛かったら version を上げる（＝着手時バンプのし忘れ）
+  - ⚠⚠ **比較の基点はタグそのもの**であって、その push の前ではない。`github.event.before` を基点にすると **1 push 分しか見ない**ので、配布物を変えた push と version を上げないまま重ねた push が分かれていると素通りする
+  - ⚠⚠ **「配布物」は 2 系統ある。片方だけ見ると漏れる。** gem として配るもの（`config/` `docs/` `lib/`）と、**タグ経由で参照されるもの**（`.github/actions/*`）
+- 🔴 **押し忘れは自動では直らない。** [gem-watch](../.github/workflows/gem-watch.yml) の `releases` ジョブが、version と最新タグのずれを**週次で一覧に出す**。⚠ 赤にはしない（着手時バンプをする以上ずれる期間は必ずあり、そこで赤くすると「赤は無視するもの」になる）
 
 ## ⚠ lint とテストを迂回しない
 
@@ -145,11 +165,12 @@ steps:
 
 ### ⚠⚠ 参照は必ず版で固定する
 
-`ginseng-style` は利用側から **2 経路**で参照される。⚠⚠ **どちらも `@main` / `branch: 'main'` にしないこと。**
+`ginseng-style` は利用側から **3 経路**で参照される。⚠⚠ **どれも `@main` / `branch: 'main'` にしないこと。**
 
 | 経路 | 何が入ってくるか | 書き方 |
 | --- | --- | --- |
 | `.github/workflows/test.yml` | CI の手順本体（composite action） | `pooza/ginseng-style/.github/actions/ruby-check@v1.1.0` |
+| `.github/workflows/release.yml` | タグを打つ手順（composite action。#65） | `pooza/ginseng-style/.github/actions/release-tag@v1.1.0` |
 | `Gemfile` | RuboCop の設定と rubocop 本体・プラグイン | `gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.0', require: false` |
 
 **固定しないと、利用側が 1 行もコミットしていないのに次の push で CI が赤くなる。** `config/rubocop.yml` に cop を足した瞬間、`NewCops: enable` があるので rubocop 本体の更新でも同じことが起きる。⚠ 「1 リポジトリで試してから配る」という下記の手順は、**配る前に全リポジトリへ届いてしまう**ので前提から崩れていた。

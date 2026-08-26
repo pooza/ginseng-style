@@ -145,3 +145,61 @@ jobs:
           echo "最新タグ: \`$latest\` / 古い参照: $stale 件" >> "$GITHUB_STEP_SUMMARY"
 
           exit $bad
+
+  # ⚠⚠ #65 で gem 側 7 本のタグを `workflow_dispatch` 契機にした。押すのは人なので、
+  # **押し忘れは自動では直らない**。⚠ これは仮定ではない — 2026-08-27 時点で
+  # `ginseng-core` は version 1.22.0 に対しタグが v1.20.0（security 修正 #580 / #582
+  # が未出荷）、`ginseng-web` は 3 版、`ginseng-redis` は 2 版遅れ、`ginseng-piefed`
+  # はタグが 1 本も無かった。**見張らないと誰も気付かない。**
+  releases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check version vs latest tag
+        env:
+          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          echo "## 出荷の滞留（version と最新タグのずれ）" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| gem | version | 最新タグ | タグ以降 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+
+          bad=0
+          for r in $GEMS; do
+            version=$(gh api -H 'Accept: application/vnd.github.raw' \
+                        "repos/pooza/$r/contents/config/lib.yaml" 2>/dev/null \
+                      | ruby -ryaml -e 'puts (YAML.safe_load($stdin.read)["package"] || {})["version"]' 2>/dev/null)
+            if [ -z "$version" ]; then
+              # ⚠⚠ version が読めないのは「ずれている」より重い。タグの正本そのものが
+              # 無いということなので、release-tag が動きようがない。
+              echo "::error::pooza/$r の config/lib.yaml から package.version を読めない"
+              echo "| \`$r\` | 🔴 読めない | - | - |" >> "$GITHUB_STEP_SUMMARY"
+              bad=1
+              continue
+            fi
+
+            latest=$(gh api "repos/pooza/$r/tags" --paginate --jq '.[].name' 2>/dev/null \
+                       | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+
+            if [ -z "$latest" ]; then
+              # ⚠ 落とさない。alpha の gem はまだ利用側を持たないことがある。
+              echo "::warning::pooza/$r にタグが 1 本も無い（version は $version）"
+              echo "| \`$r\` | $version | ⚠ なし | - |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            ahead=$(gh api "repos/pooza/$r/compare/$latest...main" --jq '.ahead_by' 2>/dev/null || echo '?')
+
+            if [ "$latest" = "v$version" ]; then
+              echo "ok       pooza/$r  $latest"
+              echo "| \`$r\` | $version | \`$latest\` | $ahead |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              # ⚠ 赤にしない。**着手時バンプをする以上、ずれている期間は必ずある**
+              # （docs/workflow.md）。ここで赤くすると「赤は無視するもの」になる。
+              echo "::warning::pooza/$r は version $version に対しタグが $latest（未出荷）"
+              echo "| \`$r\` | $version | 🟡 \`$latest\` | $ahead |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+          exit $bad
