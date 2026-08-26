@@ -71,6 +71,8 @@ jobs:
       - uses: pooza/ginseng-style/.github/actions/release-tag@v1.1.0
         with:
           mode: manual     # ⚠⚠ gem 側は manual
+          # ⚠⚠ 既定は無い。**このリポジトリが配る中身**を列挙する（下表）
+          paths: bin cert config images lib views
           token: ${{ github.token }}
 ```
 
@@ -84,6 +86,22 @@ jobs:
 - ⚠⚠ **着手時バンプをするなら `manual`。** `auto` にすると **マイルストーンの 1 本目の PR が載った時点で出荷される**
 - **出荷は `gh workflow run release.yml -R pooza/<gem>`。** ⚠ 押すのは「Issue を消化 → リリース前レビュー」の後
 - ⚠ どちらの mode でも、push のたびに**「配布物を変えたのに `v<version>` のまま」を検査して赤で教える**。引っ掛かったら version を上げる
+
+#### ⚠⚠ `paths` に既定は無い
+
+**リポジトリごとに配る中身が違うので、それらしい既定を置くと静かに取りこぼす** — つまりこの検査が一番効いてほしい場面で黙る。`git` 参照で使う以上、**`lib/` と `config/` だけではない**。2026-08-27 の実測:
+
+| リポジトリ | `paths` |
+| --- | --- |
+| `ginseng-style` | `config docs lib .github/actions` |
+| `ginseng-core` | `bin cert config images lib views` |
+| `ginseng-fediverse` | `bin config images lib` |
+| `ginseng-web` | `bin config lib public views` |
+| `ginseng-postgres` | `bin config lib query` |
+| `ginseng-redis` / `ginseng-youtube` | `bin config lib` |
+| `ginseng-piefed` | `config lib` |
+
+⚠ **`test/` は入れない。** 配る中身ではないので、テストを足すたびに版を上げることになる。
 
 ### プロジェクト固有として残してよいもの
 

@@ -29,8 +29,10 @@ inputs:
         2. タグ経由で参照されるもの — .github/actions/*（#32 の ruby-check など）
       ⚠ 2 を落とすと、利用側は `@vX.Y.Z` を刺しているので永久に受け取れず、
       **新しいタグが無いので gem-watch も気付けない**。
-    required: false
-    default: config docs lib .github/actions
+      ⚠⚠ **既定を持たせない。** リポジトリごとに配る中身が違い（`ginseng-core` は
+      `cert/` `views/` `images/`、`ginseng-web` は `public/` `views/`）、**それらしい
+      既定を置くと静かに取りこぼす** — つまりこの検査が一番効いてほしい場面で黙る。
+    required: true
   token:
     description: "タグの作成に使うトークン（`${{ github.token }}` でよい。contents: write が要る）"
     required: true
@@ -46,6 +48,14 @@ runs:
         PATHS: ${{ inputs.paths }}
       run: |
         set -euo pipefail
+
+        # ⚠⚠ 空のまま回すと `git diff -- ` が全ファイルを見る形になり、意味が変わる。
+        # ⚠ 「それらしい既定」も置かない（上記）。ここで落として列挙させる。
+        if [ -z "${PATHS// /}" ]; then
+          candidates=$(find . -maxdepth 1 -mindepth 1 -type d -not -name ".*" -printf "%f " 2>/dev/null)
+          echo "::error::paths が空。配る中身を列挙すること（このリポジトリの候補: $candidates）"
+          exit 1
+        fi
 
         case "$MODE" in
           auto|manual) ;;
