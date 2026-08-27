@@ -91,69 +91,97 @@ jobs:
         run: |
           set -uo pipefail
 
-          latest=$(gh api repos/pooza/ginseng-style/tags --paginate --jq '.[].name' \
-                     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          if [ -z "$latest" ]; then
+          # ⚠⚠ タグは付け替えられる。**書き込みトークンを渡す release-tag を動く ref で
+          # 刺すのは危ない**（#75）。参照は SHA で固定し、ここで「その SHA が実在の
+          # タグを指しているか」まで確かめる。
+          # ⚠ **コメントの `# vX.Y.Z` は信用しない。** SHA からタグを引いて突き合わせる。
+          tags=$(gh api repos/pooza/ginseng-style/tags --paginate --jq '.[] | "\(.commit.sha) \(.name)"')
+          if [ -z "$tags" ]; then
             echo "::error::pooza/ginseng-style にタグが無い。release.yml が動いていない"
             exit 1
           fi
-          echo "最新 = $latest"
+          semver=$(printf '%s\n' "$tags" | awk '$2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/')
+          latest=$(printf '%s\n' "$semver" | awk '{print $2}' | sort -V | tail -1)
+          latest_sha=$(printf '%s\n' "$semver" | awk -v t="$latest" '$2 == t {print $1; exit}')
+          if [ -z "$latest_sha" ]; then
+            echo "::error::最新タグ $latest の SHA を引けない"
+            exit 1
+          fi
+          echo "最新 = $latest ($latest_sha)"
 
           raw() { gh api -H 'Accept: application/vnd.github.raw' "repos/pooza/$1/contents/$2" 2>/dev/null; }
 
-          # ⚠⚠ 「固定されている」＝ vX.Y.Z の形であること。@main だけを弾いても、
-          # @develop のような別の可変 ref が warning で素通りする（Codex P2）。
-          pinned() { printf '%s' "$1" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; }
+          # SHA が指しているタグ名を返す（無ければ空）。
+          tag_of() { printf '%s\n' "$semver" | awk -v s="$1" '$1 == s {print $2; exit}'; }
+
+          is_sha() { printf '%s' "$1" | grep -Eq '^[0-9a-f]{40}$'; }
+          is_tag() { printf '%s' "$1" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; }
+
+          # ⚠⚠ 判定はここ 1 箇所。3 経路で同じ規則を使う。
+          #   SHA でタグを指している        → ok / 古ければ warning
+          #   SHA だがタグが無い            → 🔴 error（レビューを通っていないコミット）
+          #   vX.Y.Z                        → ⚠ warning（SHA へ移行中。#75。移行後 error へ上げる）
+          #   それ以外（@main / 空）        → error
+          check_ref() {
+            where=$1
+            ref=$2
+            if [ -z "$ref" ]; then
+              echo "::error::$where が ginseng-style を参照していない"
+              return 1
+            fi
+            if is_sha "$ref"; then
+              t=$(tag_of "$ref")
+              if [ -z "$t" ]; then
+                echo "::error::$where が @${ref} を刺しているが、この SHA に対応するタグが無い"
+                return 1
+              fi
+              if [ "$ref" != "$latest_sha" ]; then
+                echo "::warning::$where は @${ref}（$t。最新は $latest）"
+                stale=$((stale + 1))
+              fi
+              return 0
+            fi
+            if is_tag "$ref"; then
+              # ⚠ 落とさない。**移行の最中は必ずタグのままの期間がある**。
+              #   ここで赤くすると「赤は無視するもの」になる。配り切ったら error へ上げる。
+              echo "::warning::$where が @${ref}（タグ）で固定している。SHA へ移行すること（#75）"
+              stale=$((stale + 1))
+              return 0
+            fi
+            # ⚠ @main / @develop / 任意のブランチ。どれも固定されていない。
+            echo "::error::$where が @${ref} を参照している（SHA ではない）"
+            return 1
+          }
 
           bad=0
           stale=0
           for r in $GEMS; do
             [ "$r" = ginseng-style ] && continue
 
-            # Gemfile 側（設定そのもの）
-            ref=$(raw "$r" Gemfile | sed -n "s/.*ginseng-style.*tag: *['\"]\([^'\"]*\)['\"].*/\1/p" | head -1)
-            if ! pinned "$ref"; then
-              # ⚠⚠ 未固定は「設計が効いていない」ので落とす。古いのとは格が違う。
-              echo "::error::pooza/$r の Gemfile が ginseng-style を vX.Y.Z のタグで固定していない（\"${ref:-なし}\"）"
-              bad=1
-            elif [ "$ref" != "$latest" ]; then
-              # ⚠ 古いだけなら落とさない。配っている最中は必ず古い期間があり、
-              #   そこで赤くすると「赤は無視するもの」になる（それが一番高くつく）。
-              echo "::warning::pooza/$r の Gemfile は $ref（最新は $latest）"
-              stale=$((stale + 1))
-            fi
+            # ① Gemfile 側（設定そのもの）。⚠ SHA なら `ref:`、タグなら `tag:`。
+            # ⚠ `branch:` も拾う。拾わないと「参照していない」と誤診し、
+            #   **未固定という一番効いてほしい診断が別の文言に化ける**。
+            gemfile=$(raw "$r" Gemfile)
+            ref=$(printf '%s' "$gemfile" \
+                    | sed -n "s/.*ginseng-style.*\(ref\|tag\|branch\): *['\"]\([^'\"]*\)['\"].*/\2/p" | head -1)
+            check_ref "pooza/$r の Gemfile" "$ref" || bad=1
 
-            # workflow 側（共有 composite action。#32）
+            # ② test.yml 側（共有 composite action。#32）
             ref=$(raw "$r" .github/workflows/test.yml \
-                    | sed -n 's|.*pooza/ginseng-style/.github/actions/ruby-check@\([^ ]*\).*|\1|p' | head -1)
-            if [ -z "$ref" ]; then
-              echo "::error::pooza/$r の test.yml が ruby-check を参照していない"
-              bad=1
-            elif ! pinned "$ref"; then
-              # ⚠ @main / @develop / 任意のブランチ。どれも固定されていない。
-              echo "::error::pooza/$r の test.yml が ruby-check を @$ref で参照している（vX.Y.Z ではない）"
-              bad=1
-            elif [ "$ref" != "$latest" ]; then
-              echo "::warning::pooza/$r の ruby-check は @$ref（最新は $latest）"
-              stale=$((stale + 1))
-            fi
+                    | sed -n 's|.*pooza/ginseng-style/.github/actions/ruby-check@\([0-9a-zA-Z._-]*\).*|\1|p' | head -1)
+            check_ref "pooza/$r の test.yml の ruby-check" "$ref" || bad=1
 
-            # release.yml 側（タグを打つ composite action。#65）
-            # ⚠⚠ **参照は 3 経路ある。2 つだけ見ると、新しい release-tag を出しても
-            # 古い実装を刺したままの gem に気付けない**（Codex P2）。
+            # ③ release.yml 側（タグを打つ composite action。#65）
             # ⚠⚠ **「取れなかった」を「無い」と読まないこと（Codex P2）。** `raw` は
             # 診断を握り潰すうえ、`pins` は `-e` を有効にしていないので、認証・レート
-            # 制限・ネットワークの失敗がそのまま**「release.yml が無い」＝ 見逃してよい**
-            # 側へ倒れる。⚠ **404 だけを「未配布」として扱う。**
-            #
-            # ⚠ Gemfile / test.yml 側は空文字が error へ倒れる（fail closed）ので
-            # 同じ穴は開いていない。**warning で済ませるこの枝にだけ**判定が要る。
+            # 制限・ネットワークの失敗がそのまま見逃してよい側へ倒れる。
+            # ⚠ **404 だけを「無い」として扱う。**
             release_url="repos/pooza/$r/contents/.github/workflows/release.yml"
             release_ok=no
             if release=$(gh api -H 'Accept: application/vnd.github.raw' "$release_url" 2>&1); then
               release_ok=yes
             elif printf '%s' "$release" | grep -q '(HTTP 404)'; then
-              # ⚠⚠ **2026-08-27 に 8/8 へ配り終えたので error に上げた**（#65）。
+              # ⚠⚠ 2026-08-27 に 8/8 へ配り終えたので error に上げた（#65）。
               # ここから先の「無い」は配布の途中ではなく**消えた**ということで、
               # そのリポジトリは**タグが永久に打たれない**状態になる。
               echo "::error::pooza/$r に release.yml が無い。タグが打たれない（#65 で 8/8 に配布済み）"
@@ -165,24 +193,15 @@ jobs:
 
             if [ "$release_ok" = yes ]; then
               ref=$(printf '%s' "$release" \
-                      | sed -n 's|.*pooza/ginseng-style/.github/actions/release-tag@\([^ ]*\).*|\1|p' | head -1)
-              if [ -z "$ref" ]; then
-                echo "::error::pooza/$r の release.yml が release-tag を参照していない"
-                bad=1
-              elif ! pinned "$ref"; then
-                echo "::error::pooza/$r の release.yml が release-tag を @$ref で参照している（vX.Y.Z ではない）"
-                bad=1
-              elif [ "$ref" != "$latest" ]; then
-                echo "::warning::pooza/$r の release-tag は @$ref（最新は $latest）"
-                stale=$((stale + 1))
-              fi
+                      | sed -n 's|.*pooza/ginseng-style/.github/actions/release-tag@\([0-9a-zA-Z._-]*\).*|\1|p' | head -1)
+              check_ref "pooza/$r の release.yml の release-tag" "$ref" || bad=1
             fi
           done
 
           # ⚠ warning は流れて消える。ジョブサマリに残して、週次で一覧が読める形にする。
           echo "## ginseng-style の固定状況" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "最新タグ: \`$latest\` / 古い参照: $stale 件" >> "$GITHUB_STEP_SUMMARY"
+          echo "最新タグ: \`$latest\` (\`$latest_sha\`) / 古い・未移行の参照: $stale 件" >> "$GITHUB_STEP_SUMMARY"
 
           exit $bad
 

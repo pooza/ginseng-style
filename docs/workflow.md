@@ -164,15 +164,22 @@ steps:
 
 ⚠ **`matrix` / `services` / `schedule` は呼び出し側に残す。** Ruby の対応版・必要なミドルウェアは gem ごとに違う。共通化するのは手順だけ。
 
-### ⚠⚠ 参照は必ず版で固定する
+### ⚠⚠ 参照は必ず SHA で固定する
 
 `ginseng-style` は利用側から **3 経路**で参照される。⚠⚠ **どれも `@main` / `branch: 'main'` にしないこと。**
 
 | 経路 | 何が入ってくるか | 書き方 |
 | --- | --- | --- |
-| `.github/workflows/test.yml` | CI の手順本体（composite action） | `pooza/ginseng-style/.github/actions/ruby-check@v1.1.0` |
-| `.github/workflows/release.yml` | タグを打つ手順（composite action。#65） | `pooza/ginseng-style/.github/actions/release-tag@v1.1.6` |
-| `Gemfile` | RuboCop の設定と rubocop 本体・プラグイン | `gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.0', require: false` |
+| `.github/workflows/test.yml` | CI の手順本体（composite action） | `...actions/ruby-check@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7` |
+| `.github/workflows/release.yml` | タグを打つ手順（composite action。#65） | `...actions/release-tag@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7` |
+| `Gemfile` | RuboCop の設定と rubocop 本体・プラグイン | `ref: '7196764dca7628c3fd1226bcc08415f8bda2fd31' # v1.1.7` |
+
+🔴 **タグではなく SHA（#75）。** タグは付け替えられるので、`vX.Y.Z` は固定になっていない。⚠⚠ **`release-tag` は利用側の `contents: write` トークンを受け取る**ので、`ginseng-style` を取られた側が利用側の ref を作り替えられる。
+
+- **末尾に `# vX.Y.Z` をコメントで添える。** ⚠ 人間が読むためのもので、**検査には使わない**
+- ⚠⚠ **`gem-watch` の `pins` は SHA からタグを引いて突き合わせる。** コメントを信用すると、⚠ **規約に頼る ＝ ずれても気づけない**
+- 🔴 **タグの無い SHA を刺していたら赤。** レビューを通っていないコミットを刺しているということ
+- ⚠ **移行の最中、`vX.Y.Z` のままは warning に留める**（赤にすると「赤は無視するもの」になる）。配り切ったら error へ上げる
 
 **固定しないと、利用側が 1 行もコミットしていないのに次の push で CI が赤くなる。** `config/rubocop.yml` に cop を足した瞬間、`NewCops: enable` があるので rubocop 本体の更新でも同じことが起きる。⚠ 「1 リポジトリで試してから配る」という下記の手順は、**配る前に全リポジトリへ届いてしまう**ので前提から崩れていた。
 
