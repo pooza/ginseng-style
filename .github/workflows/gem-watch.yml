@@ -142,11 +142,10 @@ jobs:
               return 0
             fi
             if is_tag "$ref"; then
-              # ⚠ 落とさない。**移行の最中は必ずタグのままの期間がある**。
-              #   ここで赤くすると「赤は無視するもの」になる。配り切ったら error へ上げる。
-              echo "::warning::$where が @${ref}（タグ）で固定している。SHA へ移行すること（#75）"
-              stale=$((stale + 1))
-              return 0
+              # ⚠⚠ **2026-08-27 に 8/8 が SHA へ移り終えたので error に上げた**（#75）。
+              #   タグは付け替えられるので、これは固定になっていない。
+              echo "::error::$where が @${ref}（タグ）を参照している。タグは付け替えられるので SHA で固定すること（#75）"
+              return 1
             fi
             # ⚠ @main / @develop / 任意のブランチ。どれも固定されていない。
             echo "::error::$where が @${ref} を参照している（SHA ではない）"
