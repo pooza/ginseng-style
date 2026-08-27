@@ -37,16 +37,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # ⚠ この workflow 自身が評価されないよう、パターンは組み立てる。
-          pattern=$(printf '\x24{{')
-          bad=0
-          for f in .github/actions/*/action.yml; do
-            if sed -n '1,/^runs:/p' "$f" | grep -Fn "$pattern"; then
-              echo "::error file=$f::runs: より前に式がある。説明文でも評価され、action の読み込みが失敗する (#70)"
-              bad=1
-            fi
-          done
-          exit $bad
+          ruby -ryaml -e '
+            # ⚠ この workflow 自身が評価されないよう、目印は組み立てる。
+            marker = "\x24{{"
+            bad = false
+            Dir[".github/actions/*/action.yml"].sort.each do |f|
+              y = YAML.safe_load_file(f) || {}
+              prose = [y["name"], y["description"]]
+              # ⚠⚠ **outputs.<id>.value は式が要る**（composite action の作法）ので見ない。
+              # ⚠ 見るのは散文の欄だけ — コード例を書いてしまうのはそこ。
+              %w[inputs outputs].each do |section|
+                (y[section] || {}).each_value do |v|
+                  next unless v.is_a?(Hash)
+                  prose << v["name"] << v["description"] << v["deprecationMessage"]
+                end
+              end
+              prose.compact.each do |text|
+                next unless text.to_s.include?(marker)
+                warn "::error file=#{f}::name / description に式がある。説明文でも評価され、action の読み込みが失敗する (#70)"
+                bad = true
+              end
+            end
+            exit(bad ? 1 : 0)
+          '
       - uses: ./.github/actions/ruby-check
         with:
           # ⚠ この gem は設定と docs を配るだけで、ライブラリの実装を持たない。
