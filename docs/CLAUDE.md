@@ -14,7 +14,9 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 1. このリポジトリで `bundle exec rubocop` を通す
 2. **`config/lib.yaml` の `package.version` を上げる。** ⚠⚠ **忘れると `release` ワークフローが赤で教える**（配布物を変えたのに既存タグのまま、という状態を検出する）
-   - ⚠⚠ **このリポジトリは [workflow.md](workflow.md) の「着手時バンプ」の例外。** ここでは `release.yml` が version からタグを打つので**バンプ＝リリース**であり、**マイルストーンを埋め切ってから**上げる
+   - ⚠⚠ **このリポジトリは [workflow.md](workflow.md) の「着手時バンプ」の例外。** ここでは `release.yml` が version からタグを打つので**バンプ＝リリース**であり、**配布物を触る PR ごとに上げる（＝ 1 PR 1 リリース）。マイルストーンは待たない** (#84)
+   - ⚠⚠ **待つと `main` が赤くなる。** 配布物を触る PR が 2 本あると、**1 本目をマージした時点で**「`v<version>` があるのに配布物に差分がある」で落ちる（[release-tag](../.github/actions/release-tag/action.yml)）。⚠ 赤を避けてバンプすればそこでタグが出るので、**「埋め切ってから」はどちらへ倒しても成立しない**
+   - ⚠ **配布物を触らない PR ではバンプしない。** `docs/` は #82 で `spec.files` と `paths` の両方から外したので、**docs だけの変更は版を動かさない**（それでも緑）
 3. `main` にマージする。**タグ `v<version>` は [release.yml](../.github/workflows/release.yml) が自動で打つ**。⚠ 手で打たない
 4. **利用側 1 リポジトリで試す**。`Gemfile` のタグを新しい版へ上げ、`bundle install && bundle exec rubocop` が緑になることを確認する。⚠ `NewCops: enable` と利用側の `TargetRubyVersion` の組み合わせで、いま緑のものが赤くなりうる
    - ⚠⚠ **手元で緑になっても終わりではない。CI が回るまでが手順** (#63)。手元の Ruby は 1 版だけで、**matrix を持っているのは CI だけ**。`required_ruby_version` を 3.4 へ上げた `v1.1.3` は、手元（4.0.6）では緑のまま **3.3 を残した利用側の CI で落ちた**
