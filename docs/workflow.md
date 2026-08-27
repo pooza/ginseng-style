@@ -158,8 +158,8 @@ steps:
   - uses: actions/checkout@v5
     with:
       persist-credentials: false
-  # ⚠⚠ @main ではなく版で固定する。理由は下の「参照は必ず版で固定する」。
-  - uses: pooza/ginseng-style/.github/actions/ruby-check@v1.1.0
+  # ⚠⚠ @main でもタグでもなく SHA で固定する。理由は下の「参照は必ず SHA で固定する」。
+  - uses: pooza/ginseng-style/.github/actions/ruby-check@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7
 ```
 
 ⚠ **`matrix` / `services` / `schedule` は呼び出し側に残す。** Ruby の対応版・必要なミドルウェアは gem ごとに違う。共通化するのは手順だけ。

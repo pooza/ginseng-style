@@ -159,11 +159,16 @@ jobs:
             [ "$r" = ginseng-style ] && continue
 
             # ① Gemfile 側（設定そのもの）。⚠ SHA なら `ref:`、タグなら `tag:`。
-            # ⚠ `branch:` も拾う。拾わないと「参照していない」と誤診し、
-            #   **未固定という一番効いてほしい診断が別の文言に化ける**。
+            # ⚠⚠ **`gem` の宣言は複数行にまたがる**（Layout/LineLength の Max: 100 が
+            #   あるので、SHA を書くと 1 行に収まらない）。⚠ 1 行しか見ない実装だと、
+            #   **README がすすめている書き方がそのまま「参照していない」に化ける**（Codex P2）。
+            #   `gem 'ginseng-style'` の行から、末尾がカンマでない行までを 1 本に畳む。
+            # ⚠ `branch:` も拾う。拾わないと未固定を「参照していない」と誤診する。
             gemfile=$(raw "$r" Gemfile)
             ref=$(printf '%s' "$gemfile" \
-                    | sed -n "s/.*ginseng-style.*\(ref\|tag\|branch\): *['\"]\([^'\"]*\)['\"].*/\2/p" | head -1)
+                    | awk '/gem +.?ginseng-style.?,/ { f = 1 }
+                           f { buf = buf " " $0; if ($0 !~ /,[[:space:]]*$/) { print buf; exit } }' \
+                    | sed -n "s/.*\(ref\|tag\|branch\): *['\"]\([^'\"]*\)['\"].*/\2/p" | head -1)
             check_ref "pooza/$r の Gemfile" "$ref" || bad=1
 
             # ② test.yml 側（共有 composite action。#32）
