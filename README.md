@@ -12,24 +12,30 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 ```ruby
 group :development do
-  # ⚠⚠ tag: を必ず付ける。理由は下の「⚠⚠ 版で固定する」。
-  gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.0', require: false
+  # ⚠⚠ ref: に SHA を書く。理由は下の「⚠⚠ SHA で固定する」。
+  gem 'ginseng-style', github: 'pooza/ginseng-style',
+      ref: '7196764dca7628c3fd1226bcc08415f8bda2fd31', require: false # v1.1.7
 end
 ```
 
-### ⚠⚠ 版で固定する
+### ⚠⚠ SHA で固定する
 
-**`tag:` を付けずに（＝ `main` を追って）参照すると、利用側が 1 行もコミットしていないのに、こちらが cop を足した次の push で CI が赤くなる。** `NewCops: enable` があるので、rubocop 本体の更新でも同じことが起きる。
+**固定せずに（＝ `main` を追って）参照すると、利用側が 1 行もコミットしていないのに、こちらが cop を足した次の push で CI が赤くなる。** `NewCops: enable` があるので、rubocop 本体の更新でも同じことが起きる。
+
+⚠⚠ **タグではなく SHA で固定する（[#75](https://github.com/pooza/ginseng-style/issues/75)）。** タグは付け替えられるので、動く ref のままだと**このリポジトリを取られた側が利用側のワークフローを差し替えられる**。⚠ 特に [release-tag](.github/actions/release-tag/action.yml) は利用側の `contents: write` トークンを受け取る。
+
+- **末尾に `# vX.Y.Z` をコメントで添える。** ⚠ 人間が読むためのもの
+- ⚠⚠ **コメントは検査に使わない。** 週次の [gem-watch](.github/workflows/gem-watch.yml) は **SHA からタグを引いて突き合わせる**。⚠ **タグの無い SHA を刺していたら赤にする**（レビューを通っていないコミットを刺している）
 
 ⚠⚠ **`Gemfile.lock` は代わりにならない。** gem 側は `Gemfile.lock` を `.gitignore` しているので、**CI のチェックアウトには lock が存在せず**、毎回 `main` の HEAD が解決される。実測（2026-08-23）では、gem 側 7 本の手元と CI で **45〜48 コミット違う `ginseng-style`** を見ていた（[#53](https://github.com/pooza/ginseng-style/issues/53)）。
 
 CI の composite action を使っている場合は、**そちらも同じ版に揃える**。
 
 ```yaml
-- uses: pooza/ginseng-style/.github/actions/ruby-check@v1.1.0
+- uses: pooza/ginseng-style/.github/actions/ruby-check@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7
 ```
 
-版を上げるのは `Gemfile` と `test.yml` の 2 行を書き換える**明示的な操作**にする。⚠ **古い版で止まっているリポジトリは週次の [gem-watch](.github/workflows/gem-watch.yml) が知らせる**ので、放置には気付ける。
+版を上げるのは `Gemfile` / `test.yml` / `release.yml` の **3 行**を書き換える**明示的な操作**にする。⚠ **古い版で止まっているリポジトリは週次の [gem-watch](.github/workflows/gem-watch.yml) が知らせる**ので、放置には気付ける。
 
 `.rubocop.yml` は差分だけにする。
 
@@ -68,7 +74,7 @@ jobs:
         with:
           fetch-depth: 0   # ⚠ 判定にタグとの差分が要る。浅いと届かない
           persist-credentials: false
-      - uses: pooza/ginseng-style/.github/actions/release-tag@v1.1.6
+      - uses: pooza/ginseng-style/.github/actions/release-tag@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7
         with:
           mode: manual     # ⚠⚠ gem 側は manual
           # ⚠⚠ 既定は無い。**このリポジトリが配る中身**を列挙する（下表）
@@ -162,4 +168,4 @@ RuboCop で機械的に守れないものはこちら。
 
 ⚠ **`config/rubocop.yml` の変更は inherit している全プロジェクトに波及する。** 1 リポジトリで通してから配ること。手順は [docs/CLAUDE.md](docs/CLAUDE.md) にある。
 
-⚠⚠ **`main` にマージしただけでは誰にも届かない。** 利用側はタグで固定しているので、`config/lib.yaml` の `package.version` を上げ（タグは [release.yml](.github/workflows/release.yml) が自動で打つ）、**各リポジトリの `tag:` を上げる PR を出すところまでが手順**。
+⚠⚠ **`main` にマージしただけでは誰にも届かない。** 利用側は SHA で固定しているので、`config/lib.yaml` の `package.version` を上げ（タグは [release.yml](.github/workflows/release.yml) が自動で打つ）、**各リポジトリの参照 3 経路を新しいタグの SHA へ上げる PR を出すところまでが手順**。

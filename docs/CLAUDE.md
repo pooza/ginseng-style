@@ -18,7 +18,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 3. `main` にマージする。**タグ `v<version>` は [release.yml](../.github/workflows/release.yml) が自動で打つ**。⚠ 手で打たない
 4. **利用側 1 リポジトリで試す**。`Gemfile` のタグを新しい版へ上げ、`bundle install && bundle exec rubocop` が緑になることを確認する。⚠ `NewCops: enable` と利用側の `TargetRubyVersion` の組み合わせで、いま緑のものが赤くなりうる
    - ⚠⚠ **手元で緑になっても終わりではない。CI が回るまでが手順** (#63)。手元の Ruby は 1 版だけで、**matrix を持っているのは CI だけ**。`required_ruby_version` を 3.4 へ上げた `v1.1.3` は、手元（4.0.6）では緑のまま **3.3 を残した利用側の CI で落ちた**
-5. 問題なければ残りへ配る。1 リポジトリ 1 PR、`rake lint` が緑になったところまで。⚠ **`Gemfile` の `tag:` と `test.yml` の `ruby-check@` を同じ版に揃える**。⚠⚠ **`--show-cops` と `--list-target-files` の差分がどちらもゼロであることを確認する**（[README](../README.md) の `Include` / `Exclude` の置換）
+5. 問題なければ残りへ配る。1 リポジトリ 1 PR、`rake lint` が緑になったところまで。⚠ **参照 3 経路（`Gemfile` の `ref:` / `test.yml` の `ruby-check@` / `release.yml` の `release-tag@`）を同じタグの SHA に揃える**。⚠⚠ **`--show-cops` と `--list-target-files` の差分がどちらもゼロであることを確認する**（[README](../README.md) の `Include` / `Exclude` の置換）
 6. 破壊的な変更（既存コードの書き換えを要求するもの）は、配る前に Issue で予告する
 
 ⚠ **緩和を足す方向の変更は特に慎重に。** 1 リポジトリの都合を全体に配ることになる。
@@ -27,7 +27,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 版で固定すると「勝手に赤くなる」は止まるが、代わりに **配り忘れが永久に残る**。⚠ **これは仮定ではない** — `ginseng-core` は最後のタグ `v1.15.26` が **2026-06-10** で、以降 **88 コミット**・`bump version` は 20 回以上あるのにタグがひとつも増えていない。**手で打つ運用は死ぬ。**
 
-- タグは [release.yml](../.github/workflows/release.yml) が打つ（`config/lib.yaml` の `package.version` が正本）。⚠⚠ **手順本体は [release-tag](../.github/actions/release-tag/action.yml) にあり、gem 側 7 本も同じものを `@vX.Y.Z` で呼ぶ**（#65）
+- タグは [release.yml](../.github/workflows/release.yml) が打つ（`config/lib.yaml` の `package.version` が正本）。⚠⚠ **手順本体は [release-tag](../.github/actions/release-tag/action.yml) にあり、gem 側 7 本も同じものを `@<SHA>` で呼ぶ**（#65 / #75。⚠ タグは付け替えられるので SHA で固定する）
   - ⚠⚠ **引き金はリポジトリで違う。** このリポジトリは `mode: auto`（push＝出荷）、**gem 側 7 本は `mode: manual`（`workflow_dispatch` を人が押す）**。着手時バンプをするかどうかで決まる（[workflow.md](workflow.md) の「タグを手で打たない」）
   - 🔴 **押し忘れは [gem-watch](../.github/workflows/gem-watch.yml) の `releases` ジョブが週次で一覧に出す**（赤にはしない）
 - 古い版で止まっている利用側は、[gem-watch](../.github/workflows/gem-watch.yml) の `pins` ジョブが週次で出す
