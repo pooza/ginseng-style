@@ -29,6 +29,37 @@ jobs:
           # ⚠ 既定では認証情報がワークツリーの git config に残る。後続のステップから
           # 使えてしまうので消す。依存 gem は public な github: 参照なので影響しない。
           persist-credentials: false
+
+      # 🔴 **説明文に式を書くと action の読み込みが失敗する (#70)。**
+      # ⚠⚠ YAML としては妥当なので Psych も rubocop も通り、**release.yml は main への
+      # push でしか動かない**ので、マージするまで分からなかった。ここで止める。
+      - name: check action metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -ryaml -e '
+            # ⚠ この workflow 自身が評価されないよう、目印は組み立てる。
+            marker = "\x24{{"
+            bad = false
+            Dir[".github/actions/*/action.yml"].sort.each do |f|
+              y = YAML.safe_load_file(f) || {}
+              prose = [y["name"], y["description"]]
+              # ⚠⚠ **outputs.<id>.value は式が要る**（composite action の作法）ので見ない。
+              # ⚠ 見るのは散文の欄だけ — コード例を書いてしまうのはそこ。
+              %w[inputs outputs].each do |section|
+                (y[section] || {}).each_value do |v|
+                  next unless v.is_a?(Hash)
+                  prose << v["name"] << v["description"] << v["deprecationMessage"]
+                end
+              end
+              prose.compact.each do |text|
+                next unless text.to_s.include?(marker)
+                warn "::error file=#{f}::name / description に式がある。説明文でも評価され、action の読み込みが失敗する (#70)"
+                bad = true
+              end
+            end
+            exit(bad ? 1 : 0)
+          '
       - uses: ./.github/actions/ruby-check
         with:
           # ⚠ この gem は設定と docs を配るだけで、ライブラリの実装を持たない。
