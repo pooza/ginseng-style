@@ -12,7 +12,10 @@ Gem::Specification.new do |spec|
   spec.license = package['license']
   spec.metadata['homepage_uri'] = package['url']
   spec.metadata['rubygems_mfa_required'] = 'true'
-  spec.files = Dir['config/**/*', 'docs/**/*', 'lib/**/*', 'LICENSE.txt', 'README.md']
+  # ⚠⚠ **docs は同梱しない**（#82）。同梱された docs を読むものが何も無い一方で、
+  # `docs/` が配布物に入っていると**文章を 1 行直すだけでリリースが要る**。
+  # ⚠ 規約は GitHub の main を読む（利用側の参照も blob/main の URL）。
+  spec.files = Dir['config/**/*', 'lib/**/*', 'LICENSE.txt', 'README.md']
   spec.require_paths = ['lib']
   # ⚠⚠ **ここは「揃えたい版」ではなく「利用側の最低版」(#63)。** この gem は
   # 規約を配る側なので、利用側の版の**和集合**を飲まないと入らない。3.4 へ

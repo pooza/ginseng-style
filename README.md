@@ -99,7 +99,7 @@ jobs:
 
 | リポジトリ | `paths` |
 | --- | --- |
-| `ginseng-style` | `config docs lib LICENSE.txt README.md ginseng-style.gemspec .github/actions` |
+| `ginseng-style` | `config lib LICENSE.txt README.md ginseng-style.gemspec .github/actions` |
 | `ginseng-core` | `bin cert config images lib views ginseng-core.gemspec` |
 | `ginseng-fediverse` | `bin config images lib ginseng-fediverse.gemspec` |
 | `ginseng-web` | `bin config lib public views ginseng-web.gemspec` |
@@ -110,6 +110,10 @@ jobs:
 ⚠⚠ **`*.gemspec` を必ず入れること。** 依存と `required_ruby_version` はここにあり、**版を上げずに変えると利用側へ永久に届かない**。⚠ `required_ruby_version` を上げた `v1.1.3` が利用側の CI を落とした（[#63](https://github.com/pooza/ginseng-style/issues/63)）ように、**gemspec の 1 行が利用側を壊しうる**。
 
 ⚠ **`spec.files` に並んでいるものも入れる。** `ginseng-style` は `LICENSE.txt` / `README.md` を gem として配っている。
+
+⚠⚠ **`docs/` は配らない（[#82](https://github.com/pooza/ginseng-style/issues/82)）。** 規約は GitHub の `main` を読む前提で、**同梱された docs を読むものが何も無い**（`lib/` からも読んでいない／利用側の参照も `blob/main` の URL）。一方で `paths` に入れると**文章を 1 行直すだけでリリースが要り**、そのたびに利用側 7 本 × 3 経路が古くなる — 2026-08-27 は 5 リリース中 3 本が docs のみで、⚠ **warning が 21 件**立った。
+
+🔴 **`spec.files` と `paths` の両方から外すこと。** 片方だけ外すと、上の「`spec.files` に並んでいるものも入れる」と食い違う。
 
 ⚠ **`test/` は入れない。** 配る中身ではないので、テストを足すたびに版を上げることになる。
 
