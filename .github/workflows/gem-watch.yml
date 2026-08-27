@@ -137,11 +137,116 @@ jobs:
               echo "::warning::pooza/$r の ruby-check は @$ref（最新は $latest）"
               stale=$((stale + 1))
             fi
+
+            # release.yml 側（タグを打つ composite action。#65）
+            # ⚠⚠ **参照は 3 経路ある。2 つだけ見ると、新しい release-tag を出しても
+            # 古い実装を刺したままの gem に気付けない**（Codex P2）。
+            # ⚠⚠ **「取れなかった」を「無い」と読まないこと（Codex P2）。** `raw` は
+            # 診断を握り潰すうえ、`pins` は `-e` を有効にしていないので、認証・レート
+            # 制限・ネットワークの失敗がそのまま**「release.yml が無い」＝ 見逃してよい**
+            # 側へ倒れる。⚠ **404 だけを「未配布」として扱う。**
+            #
+            # ⚠ Gemfile / test.yml 側は空文字が error へ倒れる（fail closed）ので
+            # 同じ穴は開いていない。**warning で済ませるこの枝にだけ**判定が要る。
+            release_url="repos/pooza/$r/contents/.github/workflows/release.yml"
+            release_ok=no
+            if release=$(gh api -H 'Accept: application/vnd.github.raw' "$release_url" 2>&1); then
+              release_ok=yes
+            elif printf '%s' "$release" | grep -q '(HTTP 404)'; then
+              # ⚠ **落とさない。** 配り終えるまでは release.yml が無いのが正常で、
+              # ここで赤くすると「赤は無視するもの」になる。配り切ったら error へ上げる。
+              echo "::warning::pooza/$r に release.yml が無い（#65 の配布が未了）"
+              stale=$((stale + 1))
+            else
+              echo "::error::pooza/$r の release.yml を取得できない: $(printf '%s' "$release" | head -1)"
+              bad=1
+            fi
+
+            if [ "$release_ok" = yes ]; then
+              ref=$(printf '%s' "$release" \
+                      | sed -n 's|.*pooza/ginseng-style/.github/actions/release-tag@\([^ ]*\).*|\1|p' | head -1)
+              if [ -z "$ref" ]; then
+                echo "::error::pooza/$r の release.yml が release-tag を参照していない"
+                bad=1
+              elif ! pinned "$ref"; then
+                echo "::error::pooza/$r の release.yml が release-tag を @$ref で参照している（vX.Y.Z ではない）"
+                bad=1
+              elif [ "$ref" != "$latest" ]; then
+                echo "::warning::pooza/$r の release-tag は @$ref（最新は $latest）"
+                stale=$((stale + 1))
+              fi
+            fi
           done
 
           # ⚠ warning は流れて消える。ジョブサマリに残して、週次で一覧が読める形にする。
           echo "## ginseng-style の固定状況" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "最新タグ: \`$latest\` / 古い参照: $stale 件" >> "$GITHUB_STEP_SUMMARY"
+
+          exit $bad
+
+  # ⚠⚠ #65 で gem 側 7 本のタグを `workflow_dispatch` 契機にした。押すのは人なので、
+  # **押し忘れは自動では直らない**。⚠ これは仮定ではない — 2026-08-27 時点で
+  # `ginseng-core` は version 1.22.0 に対しタグが v1.20.0（security 修正 #580 / #582
+  # が未出荷）、`ginseng-web` は 3 版、`ginseng-redis` は 2 版遅れ、`ginseng-piefed`
+  # はタグが 1 本も無かった。**見張らないと誰も気付かない。**
+  releases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check version vs latest tag
+        env:
+          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          echo "## 出荷の滞留（version と最新タグのずれ）" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| gem | version | 最新タグ | タグ以降 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+
+          bad=0
+          for r in $GEMS; do
+            version=$(gh api -H 'Accept: application/vnd.github.raw' \
+                        "repos/pooza/$r/contents/config/lib.yaml" 2>/dev/null \
+                      | ruby -ryaml -e 'puts (YAML.safe_load($stdin.read)["package"] || {})["version"]' 2>/dev/null)
+            if [ -z "$version" ]; then
+              # ⚠⚠ version が読めないのは「ずれている」より重い。タグの正本そのものが
+              # 無いということなので、release-tag が動きようがない。
+              echo "::error::pooza/$r の config/lib.yaml から package.version を読めない"
+              echo "| \`$r\` | 🔴 読めない | - | - |" >> "$GITHUB_STEP_SUMMARY"
+              bad=1
+              continue
+            fi
+
+            # ⚠⚠ **`set -e` が無いので、失敗しても止まらない。** 取得に失敗したのを
+            # 「タグが 1 本も無い」と読むと、**滞留を見張るジョブが見張らないまま
+            # 緑で終わる**（Codex P2）。取得の成否を先に確かめる。
+            if ! tags=$(gh api "repos/pooza/$r/tags" --paginate --jq '.[].name' 2>&1); then
+              echo "::error::pooza/$r のタグ一覧を取得できない: $(printf '%s' "$tags" | head -1)"
+              echo "| \`$r\` | $version | 🔴 取得できない | - |" >> "$GITHUB_STEP_SUMMARY"
+              bad=1
+              continue
+            fi
+            latest=$(printf '%s\n' "$tags" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+
+            if [ -z "$latest" ]; then
+              # ⚠ 落とさない。alpha の gem はまだ利用側を持たないことがある。
+              echo "::warning::pooza/$r にタグが 1 本も無い（version は $version）"
+              echo "| \`$r\` | $version | ⚠ なし | - |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            ahead=$(gh api "repos/pooza/$r/compare/$latest...main" --jq '.ahead_by' 2>/dev/null || echo '?')
+
+            if [ "$latest" = "v$version" ]; then
+              echo "ok       pooza/$r  $latest"
+              echo "| \`$r\` | $version | \`$latest\` | $ahead |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              # ⚠ 赤にしない。**着手時バンプをする以上、ずれている期間は必ずある**
+              # （docs/workflow.md）。ここで赤くすると「赤は無視するもの」になる。
+              echo "::warning::pooza/$r は version $version に対しタグが $latest（未出荷）"
+              echo "| \`$r\` | $version | 🟡 \`$latest\` | $ahead |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
 
           exit $bad

@@ -45,6 +45,68 @@ AllCops:
 - rubocop 本体と `rubocop-minitest` / `rubocop-performance` / `rubocop-rake` はこの gem が依存として持つので、利用側の `development_dependency` から外せる
 - プロジェクト固有のプラグイン（`rubocop-sequel` など）と cop は、利用側の `.rubocop.yml` に書く
 
+### タグを打つワークフロー（`ginseng-*` の gem 側）
+
+🔴 **手で打つ運用は死ぬ。** 2026-08-27 の実測で、`ginseng-*` 4 gem に**計 8 版ぶんの出荷が滞留**していた（うち 1 本は security 修正 2 件が未出荷）。手順本体はこの gem の composite action にある（#65）。
+
+```yaml
+# .github/workflows/release.yml
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write        # ⚠ タグを作るので要る
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # ⚠ 判定にタグとの差分が要る。浅いと届かない
+          persist-credentials: false
+      - uses: pooza/ginseng-style/.github/actions/release-tag@v1.1.6
+        with:
+          mode: manual     # ⚠⚠ gem 側は manual
+          # ⚠⚠ 既定は無い。**このリポジトリが配る中身**を列挙する（下表）
+          paths: bin cert config images lib views ginseng-core.gemspec
+          token: ${{ github.token }}
+```
+
+**タグの正本は `config/lib.yaml` の `package.version`。** ⚠⚠ **`mode` を間違えないこと。**
+
+| `mode` | タグを打つ引き金 | 使うリポジトリ |
+| --- | --- | --- |
+| `manual` | **`workflow_dispatch`**（人が押す） | 着手時バンプをするリポジトリ（`ginseng-*` の gem 側） |
+| `auto` | `main` への push | バンプ＝リリースのリポジトリ（`ginseng-style` 自身） |
+
+- ⚠⚠ **着手時バンプをするなら `manual`。** `auto` にすると **マイルストーンの 1 本目の PR が載った時点で出荷される**
+- **出荷は `gh workflow run release.yml -R pooza/<gem>`。** ⚠ 押すのは「Issue を消化 → リリース前レビュー」の後
+- ⚠ どちらの mode でも、push のたびに**「配布物を変えたのに `v<version>` のまま」を検査して赤で教える**。引っ掛かったら version を上げる
+
+#### ⚠⚠ `paths` に既定は無い
+
+**リポジトリごとに配る中身が違うので、それらしい既定を置くと静かに取りこぼす** — つまりこの検査が一番効いてほしい場面で黙る。`git` 参照で使う以上、**`lib/` と `config/` だけではない**。2026-08-27 の実測:
+
+| リポジトリ | `paths` |
+| --- | --- |
+| `ginseng-style` | `config docs lib LICENSE.txt README.md ginseng-style.gemspec .github/actions` |
+| `ginseng-core` | `bin cert config images lib views ginseng-core.gemspec` |
+| `ginseng-fediverse` | `bin config images lib ginseng-fediverse.gemspec` |
+| `ginseng-web` | `bin config lib public views ginseng-web.gemspec` |
+| `ginseng-postgres` | `bin config lib query ginseng-postgres.gemspec` |
+| `ginseng-redis` / `ginseng-youtube` | `bin config lib <name>.gemspec` |
+| `ginseng-piefed` | `config lib ginseng-piefed.gemspec` |
+
+⚠⚠ **`*.gemspec` を必ず入れること。** 依存と `required_ruby_version` はここにあり、**版を上げずに変えると利用側へ永久に届かない**。⚠ `required_ruby_version` を上げた `v1.1.3` が利用側の CI を落とした（[#63](https://github.com/pooza/ginseng-style/issues/63)）ように、**gemspec の 1 行が利用側を壊しうる**。
+
+⚠ **`spec.files` に並んでいるものも入れる。** `ginseng-style` は `LICENSE.txt` / `README.md` を gem として配っている。
+
+⚠ **`test/` は入れない。** 配る中身ではないので、テストを足すたびに版を上げることになる。
+
 ### プロジェクト固有として残してよいもの
 
 - `AllCops/TargetRubyVersion`
