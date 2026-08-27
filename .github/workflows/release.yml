@@ -35,5 +35,7 @@ jobs:
           # ⚠⚠ 既定は無い。**このリポジトリが配る中身**を列挙する（#65）。
           # `.github/actions` を落とすと、利用側は ruby-check / release-tag を
           # `@vX.Y.Z` で刺しているので**永久に受け取れない**。
-          paths: config docs lib LICENSE.txt README.md ginseng-style.gemspec .github/actions
+          # ⚠⚠ docs は入れない（#82）。**spec.files からも外してある** —
+          # 片方だけ外すと README の「spec.files に並んでいるものも入れる」と食い違う。
+          paths: config lib LICENSE.txt README.md ginseng-style.gemspec .github/actions
           token: ${{ github.token }}
