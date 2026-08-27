@@ -29,6 +29,24 @@ jobs:
           # ⚠ 既定では認証情報がワークツリーの git config に残る。後続のステップから
           # 使えてしまうので消す。依存 gem は public な github: 参照なので影響しない。
           persist-credentials: false
+
+      # 🔴 **説明文に式を書くと action の読み込みが失敗する (#70)。**
+      # ⚠⚠ YAML としては妥当なので Psych も rubocop も通り、**release.yml は main への
+      # push でしか動かない**ので、マージするまで分からなかった。ここで止める。
+      - name: check action metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ⚠ この workflow 自身が評価されないよう、パターンは組み立てる。
+          pattern=$(printf '\x24{{')
+          bad=0
+          for f in .github/actions/*/action.yml; do
+            if sed -n '1,/^runs:/p' "$f" | grep -Fn "$pattern"; then
+              echo "::error file=$f::runs: より前に式がある。説明文でも評価され、action の読み込みが失敗する (#70)"
+              bad=1
+            fi
+          done
+          exit $bad
       - uses: ./.github/actions/ruby-check
         with:
           # ⚠ この gem は設定と docs を配るだけで、ライブラリの実装を持たない。

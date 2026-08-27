@@ -34,7 +34,10 @@ inputs:
       既定を置くと静かに取りこぼす** — つまりこの検査が一番効いてほしい場面で黙る。
     required: true
   token:
-    description: "タグの作成に使うトークン（`${{ github.token }}` でよい。contents: write が要る）"
+    description: |
+      タグの作成に使うトークン。呼び出し側から github.token を渡す（contents: write が要る）。
+      ⚠⚠ **ここに式を書かないこと（#70）。** 波かっこ 2 つの形は説明文でも評価され、
+      action そのものの読み込みが失敗する。⚠ YAML としては妥当なので手元では気付けない。
     required: true
 
 runs:
