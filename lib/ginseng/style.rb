@@ -1,7 +1,10 @@
 require 'yaml'
 
 module Ginseng
-  # 設定ファイルと規約 docs を配るだけの gem。ライブラリとしての実装は持たない。
+  # RuboCop の設定を配るだけの gem。ライブラリとしての実装は持たない。
+  #
+  # ⚠ **規約 docs は配らない**（#82）。GitHub の main を読む前提で、gem には
+  # 同梱しない。`docs_dir` はそれに伴って消した（呼び出し元は無かった）。
   #
   # ⚠ **ginseng-core に依存させないこと。** ginseng-core 側もこの gem の規約に
   # 従う側なので、依存させると循環する。
@@ -17,10 +20,6 @@ module Ginseng
     # 利用側が `inherit_gem` に書くパス。
     def self.rubocop_config_path
       return File.join(dir, 'config/rubocop.yml')
-    end
-
-    def self.docs_dir
-      return File.join(dir, 'docs')
     end
   end
 end
