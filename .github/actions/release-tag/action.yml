@@ -78,7 +78,20 @@ runs:
         fi
         tag="v$version"
 
-        if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+        # ⚠⚠ **「失敗した」と「無かった」を混ぜないこと（Codex P2）。** `gh api` は
+        # 認証切れ・ネットワーク・レート制限でも非ゼロで返る。それを「タグが無い」と
+        # 読むと、**実際にはタグがあるのに配布物の差分検査を飛ばして緑になる**
+        # ＝ この action が一番効いてほしい場面で黙る。**404 だけを不在として扱う。**
+        if tag_error=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --silent 2>&1); then
+          tag_exists=yes
+        elif printf '%s' "$tag_error" | grep -q '(HTTP 404)'; then
+          tag_exists=no
+        else
+          echo "::error::$tag の有無を確認できない: $tag_error"
+          exit 1
+        fi
+
+        if [ "$tag_exists" = yes ]; then
           # ⚠⚠ 既にあるのに配布物が変わっていたら、**利用側には永久に届かない変更**を
           # main に入れたということ。tag は動かさず、ここで落として気付く。
           #

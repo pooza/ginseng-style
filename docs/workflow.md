@@ -171,7 +171,7 @@ steps:
 | 経路 | 何が入ってくるか | 書き方 |
 | --- | --- | --- |
 | `.github/workflows/test.yml` | CI の手順本体（composite action） | `pooza/ginseng-style/.github/actions/ruby-check@v1.1.0` |
-| `.github/workflows/release.yml` | タグを打つ手順（composite action。#65） | `pooza/ginseng-style/.github/actions/release-tag@v1.1.0` |
+| `.github/workflows/release.yml` | タグを打つ手順（composite action。#65） | `pooza/ginseng-style/.github/actions/release-tag@v1.1.6` |
 | `Gemfile` | RuboCop の設定と rubocop 本体・プラグイン | `gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.0', require: false` |
 
 **固定しないと、利用側が 1 行もコミットしていないのに次の push で CI が赤くなる。** `config/rubocop.yml` に cop を足した瞬間、`NewCops: enable` があるので rubocop 本体の更新でも同じことが起きる。⚠ 「1 リポジトリで試してから配る」という下記の手順は、**配る前に全リポジトリへ届いてしまう**ので前提から崩れていた。

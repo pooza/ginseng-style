@@ -68,11 +68,11 @@ jobs:
         with:
           fetch-depth: 0   # ⚠ 判定にタグとの差分が要る。浅いと届かない
           persist-credentials: false
-      - uses: pooza/ginseng-style/.github/actions/release-tag@v1.1.0
+      - uses: pooza/ginseng-style/.github/actions/release-tag@v1.1.6
         with:
           mode: manual     # ⚠⚠ gem 側は manual
           # ⚠⚠ 既定は無い。**このリポジトリが配る中身**を列挙する（下表）
-          paths: bin cert config images lib views
+          paths: bin cert config images lib views ginseng-core.gemspec
           token: ${{ github.token }}
 ```
 
@@ -93,13 +93,17 @@ jobs:
 
 | リポジトリ | `paths` |
 | --- | --- |
-| `ginseng-style` | `config docs lib .github/actions` |
-| `ginseng-core` | `bin cert config images lib views` |
-| `ginseng-fediverse` | `bin config images lib` |
-| `ginseng-web` | `bin config lib public views` |
-| `ginseng-postgres` | `bin config lib query` |
-| `ginseng-redis` / `ginseng-youtube` | `bin config lib` |
-| `ginseng-piefed` | `config lib` |
+| `ginseng-style` | `config docs lib LICENSE.txt README.md ginseng-style.gemspec .github/actions` |
+| `ginseng-core` | `bin cert config images lib views ginseng-core.gemspec` |
+| `ginseng-fediverse` | `bin config images lib ginseng-fediverse.gemspec` |
+| `ginseng-web` | `bin config lib public views ginseng-web.gemspec` |
+| `ginseng-postgres` | `bin config lib query ginseng-postgres.gemspec` |
+| `ginseng-redis` / `ginseng-youtube` | `bin config lib <name>.gemspec` |
+| `ginseng-piefed` | `config lib ginseng-piefed.gemspec` |
+
+⚠⚠ **`*.gemspec` を必ず入れること。** 依存と `required_ruby_version` はここにあり、**版を上げずに変えると利用側へ永久に届かない**。⚠ `required_ruby_version` を上げた `v1.1.3` が利用側の CI を落とした（[#63](https://github.com/pooza/ginseng-style/issues/63)）ように、**gemspec の 1 行が利用側を壊しうる**。
+
+⚠ **`spec.files` に並んでいるものも入れる。** `ginseng-style` は `LICENSE.txt` / `README.md` を gem として配っている。
 
 ⚠ **`test/` は入れない。** 配る中身ではないので、テストを足すたびに版を上げることになる。
 
