@@ -153,10 +153,11 @@ jobs:
             if release=$(gh api -H 'Accept: application/vnd.github.raw' "$release_url" 2>&1); then
               release_ok=yes
             elif printf '%s' "$release" | grep -q '(HTTP 404)'; then
-              # ⚠ **落とさない。** 配り終えるまでは release.yml が無いのが正常で、
-              # ここで赤くすると「赤は無視するもの」になる。配り切ったら error へ上げる。
-              echo "::warning::pooza/$r に release.yml が無い（#65 の配布が未了）"
-              stale=$((stale + 1))
+              # ⚠⚠ **2026-08-27 に 8/8 へ配り終えたので error に上げた**（#65）。
+              # ここから先の「無い」は配布の途中ではなく**消えた**ということで、
+              # そのリポジトリは**タグが永久に打たれない**状態になる。
+              echo "::error::pooza/$r に release.yml が無い。タグが打たれない（#65 で 8/8 に配布済み）"
+              bad=1
             else
               echo "::error::pooza/$r の release.yml を取得できない: $(printf '%s' "$release" | head -1)"
               bad=1
