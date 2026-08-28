@@ -365,12 +365,17 @@ repo=<owner>/<repo>
 # ⚠⚠ gh を単独で走らせ、終了ステータスを見てから jq に渡す。パイプで繋ぐと
 #   パイプ全体の状態が jq のものになり、ページングの途中で失敗しても
 #   「出し終えた分だけ」を全履歴として走査してしまう ＝ 偽のゼロ。
-gh api --paginate "repos/$repo/pulls/comments?per_page=100" > /tmp/codex-raw.json \
+# ⚠ 上書きは >| で。zsh の noclobber を有効にしていると > が既存ファイルを拒む。
+gh api --paginate "repos/$repo/pulls/comments?per_page=100" >| /tmp/codex-raw.json \
   || { echo '走査に失敗した。結果を信用しないこと' >&2; exit 1; }
-jq -s add /tmp/codex-raw.json > /tmp/codex.json
+jq -s add /tmp/codex-raw.json >| /tmp/codex.json
 jq -r '. as $all | $all[] | . as $c
   | select(.user.login == "chatgpt-codex-connector[bot]")
-  | select(([$all[] | select(.in_reply_to_id == $c.id)] | length) == 0
+  # ⚠⚠ GitHub は返信をスレッドの**根**に紐づける。$c.id で引くと入れ子が永久に残る。
+  | (.in_reply_to_id // .id) as $root
+  | select(([$all[] | select((.in_reply_to_id // .id) == $root)
+                    | select(.user.login != "chatgpt-codex-connector[bot]")
+                    | select(.created_at > $c.created_at)] | length) == 0
            or ((.reactions["+1"] // 0) + (.reactions["-1"] // 0)) == 0)
   | "PR#\(.pull_request_url | split("/") | last) \(.id) \(.path)"' /tmp/codex.json
 ```
@@ -378,7 +383,12 @@ jq -r '. as $all | $all[] | . as $c
 - ⚠⚠ **`gh pr list --limit N` で回す形にしない。** N 本より古い PR に遅れて届いたレビューへ永遠に到達しない ＝ **この節が防ごうとしている失敗そのもの**
 - ⚠ **`gh api` は `--paginate` を付けないと 1 ページ目しか見ない**
 - ⚠⚠ **`gh api ... | jq` と繋がない。** 失敗したページングを握り潰し、**部分的な結果を「全部見た」として扱う**
+- ⚠ **zsh の `noclobber` を有効にしていると `>` が既存ファイルを拒む。** 2 回目の走査が `file exists` で落ちるので、`>|` で上書きする（⚠ 上の例も 2 か所とも `>|` にしてある。**書き換え忘れると、注意書きの直後の例がその注意どおり落ちる**）
 - ⚠⚠ **`reactions.total_count` を完了判定に使わない。** 👀 や ❤️ が 1 つ付いただけで非ゼロになり、**未処理のものが走査から消える**。**返信の有無**と **👍 / 👎 の数**を別々に見る
+- 🔴 **返信は「そのコメント宛」では引けない (#89)。** ⚠⚠ **GitHub はスレッドへの返信を必ず根のコメントに紐づける** — `pulls/{n}/comments/{id}/replies` に入れ子の `id` を指定して投げても、返る `in_reply_to_id` は**根**になる。`in_reply_to_id == $c.id` で引くと、**スレッドの 2 通目以降は返信も 👍 も付いているのに永久に「未処理」として出続ける**（実測: `#87` の `id=3876427332`）
+  - **スレッド単位で「その指摘より後に来た、bot 以外の返信」を見る**（上の jq）
+  - ⚠ **「後から来た」で見ること。** 根への返信を無条件に数えると、**新しい指摘が古い返信で消える**
+  - ⚠⚠ **消えない未処理を出し続ける走査は、走査ごと信用されなくなる。** ここが濁ると、この節が防ごうとしている取り残しがノイズに紛れる
 
 ⚠ **`pulls/comments` は行に紐づくレビューコメントしか返さない。** PR 本体のコメントは `repos/$repo/issues/comments` で同じように取る。**他リポジトリを触っている別セッションからの申し送りはこちらに来る**（投稿者は bot ではなく人）。⚠ **open PR も対象に含める**（上の API はどちらも含む）。
 
