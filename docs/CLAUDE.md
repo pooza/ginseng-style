@@ -26,6 +26,9 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 4. **利用側 1 リポジトリで試す**。`Gemfile` のタグを新しい版へ上げ、`bundle install && bundle exec rubocop` が緑になることを確認する。⚠ `NewCops: enable` と利用側の `TargetRubyVersion` の組み合わせで、いま緑のものが赤くなりうる
    - ⚠⚠ **手元で緑になっても終わりではない。CI が回るまでが手順** (#63)。手元の Ruby は 1 版だけで、**matrix を持っているのは CI だけ**。`required_ruby_version` を 3.4 へ上げた `v1.1.3` は、手元（4.0.6）では緑のまま **3.3 を残した利用側の CI で落ちた**
 5. 問題なければ残りへ配る。1 リポジトリ 1 PR、`rake lint` が緑になったところまで。⚠ **参照 3 経路（`Gemfile` の `ref:` / `test.yml` の `ruby-check@` / `release.yml` の `release-tag@`）を同じタグの SHA に揃える**。⚠⚠ **`--show-cops` と `--list-target-files` の差分がどちらもゼロであることを確認する**（[README](../README.md) の `Include` / `Exclude` の置換）
+   - 🔴 **`Include` に足した版を配るときは、`AllCops/Include` を上書きしている利用側を洗い出して同じ分を足す (#95)。** ⚠⚠ **正本に足しただけでは届かない**（置換されるので、その利用側の対象は 1 つも増えない）
+   - ⚠⚠ **確認は件数ではなく `--list-target-files` の中身。** 「offense が出なかった」は**対象になっていないとき**も同じ見え方になる — 実例: `makoto2` は「89 files inspected, no offenses」のまま `Gemfile` が検査されておらず、Codex の指摘で気づいた
+   - ⚠ **結果は 3 通りに分かれる。** ①そのまま増える ②`Include` を上書きしていて増えない（**足しに行く**）③`Exclude` で意図的に外している（**増えないのが正しい**）
 6. 破壊的な変更（既存コードの書き換えを要求するもの）は、配る前に Issue で予告する
 
 ⚠ **緩和を足す方向の変更は特に慎重に。** 1 リポジトリの都合を全体に配ることになる。
