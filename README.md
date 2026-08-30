@@ -133,6 +133,8 @@ jobs:
 - **`Exclude` は `inherit_mode` で足す**
 - ⚠ **`Include` は `inherit_mode` に入れない。** 入れると rubocop 既定の Include（`Gemfile` など）まで戻ってきて、他のリポジトリと lint 対象がずれる。**必要な分を全部書く**
 
+🔴 **正本自身がこの罠を踏んでいた (#80)。** `Include` に 3 つしか書いていなかったので、rubocop 既定に入っている **`Gemfile` と `*.gemspec` が全リポジトリで lint されていなかった**（`ginseng-core` の `Gemfile` に 10 スペース字下げの行が残っていた）。⚠⚠ **`Include` に足すときは「rubocop 既定にあるか」を確かめる** — 既定にあるものを書き漏らすのは**取りこぼし**で、既定に無いものを足すのは別の判断。
+
 ```yaml
 inherit_gem:
   ginseng-style: config/rubocop.yml
@@ -145,9 +147,11 @@ AllCops:
   Exclude:
     - seed/**/*      # 継承した Exclude に足される
   Include:
-    # ⚠ 置換されるので、継承分（config/rubocop.yml の 3 つ）も含めて全部書く。
+    # ⚠ 置換されるので、継承分（config/rubocop.yml の 5 つ）も含めて全部書く。
     #   1 つでも落とすと、そのパターンのファイルが黙って lint 対象から外れる。
     - '**/*.rb'
+    - '**/*.gemspec'
+    - '**/Gemfile'
     - '**/Rakefile'
     - '**/config.ru'
     - bin/makoto     # ここから下がプロジェクト固有

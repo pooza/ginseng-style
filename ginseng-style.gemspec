@@ -30,8 +30,4 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'rubocop-minitest'
   spec.add_dependency 'rubocop-performance'
   spec.add_dependency 'rubocop-rake'
-
-  # ⚠ このリポジトリの Rakefile を回すためだけに要る。他の gem は ginseng-core
-  # 経由で rake が入るが、⚠⚠ この gem は ginseng-core に依存させられない（循環する）。
-  spec.add_development_dependency 'rake'
 end
