@@ -37,8 +37,15 @@ AllCops:
     # ⚠ CI は bundler-cache でここに gem を展開する。除外しないと、gem 側の
     # .rubocop.yml（rubocop-rspec を require する等）まで読みに行って落ちる。
     - vendor/**/*
+  # ⚠⚠ **`Include` は rubocop 既定の配列を「置換」する（マージされない）。**
+  # 既定には `**/Gemfile` / `**/*.gemspec` も入っているので、ここに書き漏らすと
+  # **黙って lint 対象から落ちる**（pooza/ginseng-style#80。⚠ `Gemfile` の
+  # 字下げ崩れが誰にも気づかれず残っていた）。⚠ **足すときは既定にあるかを
+  # 確かめる** — 既定に無いものを足すのは別の判断。
   Include:
     - '**/*.rb'
+    - '**/*.gemspec'
+    - '**/Gemfile'
     - '**/Rakefile'
     - '**/config.ru'
   NewCops: enable
@@ -46,6 +53,13 @@ AllCops:
   # ⚠⚠ **下限ではない。** これより低い版が要るリポジトリは自分で下げる
   # （`ginseng-core` は 3.3 のまま。pooza/ginseng-style#61）。
   TargetRubyVersion: 3.4
+# ⚠⚠ **`required_ruby_version` と `TargetRubyVersion` は決め方が違う (#61 / #63)。**
+# 前者は「どの版に入るか」＝ **利用側の最低版**、後者は「どの版向けに lint するか」＝
+# **揃えたい版**。この cop は両者が等しいことを要求するが、🔴 **等しくするために
+# `required_ruby_version` を上げると利用側が入らなくなる** — 実際に v1.1.3 で
+# 3.4 へ上げ、3.3 を残していた ginseng-core の CI を落とした。
+Gemspec/RequiredRubyVersion:
+  Enabled: false
 Layout/ArgumentAlignment:
   EnforcedStyle: with_fixed_indentation
 Layout/ArrayAlignment:
