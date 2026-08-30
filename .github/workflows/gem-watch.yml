@@ -314,7 +314,7 @@ jobs:
   # 止める代わりに「**いつまでも古い linter のまま**」を招く（`pins` と同じ構造）。
   # 追随の合図をここで出す。⚠⚠ **赤にはしない** — 上げるかどうかは 8 リポジトリで
   # `bundle exec rubocop` を通してからの判断で、上げていない期間があるのが正常。
-  # ⚠ 制約そのものが外れていたら（`>= 0`）落とす。そこは「古い」ではなく「壊れた」。
+  # ⚠ 上限が無くなっていたら落とす。そこは「古い」ではなく「壊れた」。
   linters:
     runs-on: ubuntu-latest
     steps:
@@ -344,10 +344,14 @@ jobs:
 
             spec.runtime_dependencies.sort_by(&:name).each do |dep|
               req = dep.requirement
-              if req.none?
-                # ⚠⚠ 「>= 0」は固定されていないということ。#55 の穴がそのまま戻る。
-                warn "::error::#{dep.name} に版の制約が無い（#55 の悲観固定が外れている）"
-                rows << "| `#{dep.name}` | 🔴 制約なし | - | - |"
+              # ⚠⚠ **見るのは「制約が在るか」ではなく「上限が在るか」（Codex P2）。**
+              # `Gem::Requirement#none?` は `>= 0` しか捕まえないので、`>= 1.90.0` へ
+              # 緩めると **この見張り自身が緑のまま #55 の穴が戻る**。⚠ 上限を作る
+              # 演算子（`~>` / `<` / `<=` / `=`）が 1 つも無ければ落とす。
+              upper = req.requirements.any? { |op, _| ["~>", "<", "<=", "="].include?(op) }
+              unless upper
+                warn "::error::#{dep.name} の制約 `#{req}` に上限が無い（#55 の悲観固定が外れている）"
+                rows << "| `#{dep.name}` | 🔴 `#{req}`（上限なし） | - | - |"
                 bad = 1
                 next
               end
