@@ -309,3 +309,87 @@ jobs:
           done
 
           exit $bad
+
+  # ⚠⚠ #55 で rubocop 系を gemspec で悲観固定した。⚠ 固定は「勝手に赤くなる」を
+  # 止める代わりに「**いつまでも古い linter のまま**」を招く（`pins` と同じ構造）。
+  # 追随の合図をここで出す。⚠⚠ **赤にはしない** — 上げるかどうかは 8 リポジトリで
+  # `bundle exec rubocop` を通してからの判断で、上げていない期間があるのが正常。
+  # ⚠ 上限が無くなっていたら落とす。そこは「古い」ではなく「壊れた」。
+  linters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # ⚠ 読むだけ。認証情報をワークツリーに残さない。
+          persist-credentials: false
+
+      - name: check whether pinned linters are current
+        run: |
+          set -uo pipefail
+          ruby -e '
+            require "json"
+            require "net/http"
+
+            # ⚠ 対象は決め打ちにしない。gemspec の runtime 依存が正本なので、
+            # 増えたプラグインも自動で見張られる。
+            spec = Gem::Specification.load("ginseng-style.gemspec")
+            unless spec
+              warn "::error::ginseng-style.gemspec を読めない"
+              exit 1
+            end
+
+            rows = []
+            bad = 0
+            stale = 0
+
+            spec.runtime_dependencies.sort_by(&:name).each do |dep|
+              req = dep.requirement
+              # ⚠⚠ **見るのは「制約が在るか」ではなく「上限が在るか」（Codex P2）。**
+              # `Gem::Requirement#none?` は `>= 0` しか捕まえないので、`>= 1.90.0` へ
+              # 緩めると **この見張り自身が緑のまま #55 の穴が戻る**。⚠ 上限を作る
+              # 演算子（`~>` / `<` / `<=` / `=`）が 1 つも無ければ落とす。
+              upper = req.requirements.any? { |op, _| ["~>", "<", "<=", "="].include?(op) }
+              unless upper
+                warn "::error::#{dep.name} の制約 `#{req}` に上限が無い（#55 の悲観固定が外れている）"
+                rows << "| `#{dep.name}` | 🔴 `#{req}`（上限なし） | - | - |"
+                bad = 1
+                next
+              end
+
+              uri = URI("https://rubygems.org/api/v1/versions/#{dep.name}/latest.json")
+              begin
+                res = Net::HTTP.get_response(uri)
+                raise "HTTP #{res.code}" unless res.is_a?(Net::HTTPSuccess)
+                latest = JSON.parse(res.body)["version"].to_s
+                raise "version を読めない" if latest.empty? || latest == "unknown"
+              rescue StandardError => e
+                # ⚠⚠ **「取れなかった」を「最新のまま」と読まない。** ここを黙って
+                # 通すと、見張るジョブが見張らないまま緑で終わる（`releases` と同じ轍）。
+                warn "::error::#{dep.name} の最新版を取得できない: #{e.message}"
+                rows << "| `#{dep.name}` | `#{req}` | 🔴 取得できない | - |"
+                bad = 1
+                next
+              end
+
+              if req.satisfied_by?(Gem::Version.new(latest))
+                rows << "| `#{dep.name}` | `#{req}` | #{latest} | ✅ |"
+              else
+                warn "::warning::#{dep.name} は `#{req}` に固定されているが、最新は #{latest}"
+                rows << "| `#{dep.name}` | `#{req}` | #{latest} | 🟡 追随待ち |"
+                stale += 1
+              end
+            end
+
+            # ⚠ warning は流れて消える。週次で読める一覧はサマリのほうが正本。
+            File.open(ENV["GITHUB_STEP_SUMMARY"], "a") do |f|
+              f.puts "## linter の固定状況（#55）"
+              f.puts ""
+              f.puts "| gem | 制約 | 最新 | |"
+              f.puts "| --- | --- | --- | --- |"
+              rows.each { |r| f.puts r }
+              f.puts ""
+              f.puts "- 🟡 追随待ち: #{stale} 件"
+            end
+
+            exit bad
+          '

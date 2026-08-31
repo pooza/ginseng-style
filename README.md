@@ -20,7 +20,7 @@ end
 
 ### ⚠⚠ SHA で固定する
 
-**固定せずに（＝ `main` を追って）参照すると、利用側が 1 行もコミットしていないのに、こちらが cop を足した次の push で CI が赤くなる。** `NewCops: enable` があるので、rubocop 本体の更新でも同じことが起きる。
+**固定せずに（＝ `main` を追って）参照すると、利用側が 1 行もコミットしていないのに、こちらが cop を足した次の push で CI が赤くなる。** ⚠⚠ **rubocop 本体も同じ経路で赤くしていた** — `NewCops: enable` なので、**新しい cop はリリースの翌日に有効になる**（実測: 過去 12 か月の新 cop 27 個は全部 `pending`）。[#55](https://github.com/pooza/ginseng-style/issues/55) で rubocop 系を gemspec で悲観固定したので、**SHA をひとつ固定すれば linter の版まで止まる。**
 
 ⚠⚠ **タグではなく SHA で固定する（[#75](https://github.com/pooza/ginseng-style/issues/75)）。** タグは付け替えられるので、動く ref のままだと**このリポジトリを取られた側が利用側のワークフローを差し替えられる**。⚠ 特に [release-tag](.github/actions/release-tag/action.yml) は利用側の `contents: write` トークンを受け取る。
 
@@ -48,7 +48,7 @@ AllCops:
 ```
 
 - ⚠ **`bundle exec rubocop` で実行すること。** `inherit_gem` は gem のパス解決に Bundler を使う
-- rubocop 本体と `rubocop-minitest` / `rubocop-performance` / `rubocop-rake` はこの gem が依存として持つので、利用側の `development_dependency` から外せる
+- rubocop 本体と `rubocop-minitest` / `rubocop-performance` / `rubocop-rake` はこの gem が依存として持つので、利用側の `development_dependency` から外せる。⚠⚠ **版は `~> x.y.0` で悲観固定してある** — 上がるのは**この gem の版を上げたときだけ**（[#55](https://github.com/pooza/ginseng-style/issues/55)）
 - プロジェクト固有のプラグイン（`rubocop-sequel` など）と cop は、利用側の `.rubocop.yml` に書く
 
 ### タグを打つワークフロー（`ginseng-*` の gem 側）
