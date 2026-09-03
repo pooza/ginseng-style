@@ -416,6 +416,7 @@ PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて�
 | 指摘あり | **review**（`pulls/N/comments` に行紐づきで届く） |
 | **指摘なし** | **issue コメント**1 本（`Didn't find any major issues.`）。⚠ **review は作られない** |
 | 🔴 **指摘なし** | **PR 本体への 👍**（`issues/N/reactions` の bot の `+1`）。⚠⚠ **review でもコメントでもない** |
+| 🔴🔴 **まだ結果ではない** | **PR 本体への 👀**（同じ `issues/N/reactions` の `eyes`）。⚠⚠ **「読み始めた」の合図で、成果物ではない** |
 
 ⚠ Codex 自身の説明文がそう言っている — *"If Codex has suggestions, it will comment; otherwise it will react with 👍."*
 
@@ -431,6 +432,9 @@ PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて�
 > 実例（2026-08-27）: `.reviews[]` だけで 8 リポジトリを走査し、**`ginseng-piefed` は Codex が繋がっていない**と結論して Issue まで立てた。⚠⚠ **実際は繋がっていて、過去の PR が全部「指摘なし」だっただけ**。さらにその PR 群は**作成からマージまで 1〜23 分**で、レビューが返る前に閉じていた。
 
 - **走査は 4 経路。** `pulls/N/reviews`（本文）・`pulls/N/comments`（インライン）・`issues/N/comments`・🔴 **`issues/N/reactions`**。⚠ 片方だけの走査は「無い」の根拠にならない
+- 🔴🔴 **リアクションは `content == "+1"` で絞る (#101)。** ⚠⚠ **bot は結果より先に 👀 を付ける**ので、`.user.login` だけで絞ると**「レビューが着いた」が PR 作成の数秒後に成立する**
+  > 実測（[#100](https://github.com/pooza/ginseng-style/pull/100)）: PR 作成 `07:42:04` → bot の `eyes` `07:42:10`。⚠ **その時点で reviews / インライン / issue コメントはすべて 0 件**だった。⚠⚠ 下記「取り残し」の走査で `reactions.total_count` を禁じているのと**同じ理由が待機ループにも効く**
+  - ⚠ **`eyes` は終了条件に入れない。** 入れるなら「まだ来ていない」側の傍証として使う
 - 🔴 **待機ループの終了条件も 4 経路で組む。** ⚠⚠ **「無いの測り方」を知っていても、終了条件に写さなければ意味が無い** — 1 巡目が review で来ると、待ち方までその形に引っ張られる
   > 実例（2026-08-31）: [#97](https://github.com/pooza/ginseng-style/pull/97) の 2 巡目を `until .reviews[] が 2 件になるまで` で待って 10 分 timeout した。⚠ **👍 だけの巡なら永久に来ない条件**で、timeout したとき**「まだ来ていない」のか「拾えない形で来ていた」のかを区別できていなかった**
 - 🔴🔴 **ただし「4 経路の OR」だけでは 2 巡目以降で即座に成立する（Codex P2）。** ⚠⚠ **前の巡の review・コメント・👍 が全部残っているので、条件は最初のポーリングで真になる** ＝ **待たずに「指摘なし」と判断する**
@@ -460,8 +464,9 @@ jq -s add /tmp/issues-raw.json >| /tmp/issues.json
 jq -r '.[] | select(.pull_request) | select(.reactions["+1"] > 0) | .number' /tmp/issues.json
 
 # ⚠ 誰が付けたかは一覧に載らない。候補だけ引き直す。
+# ⚠⚠ content で絞る。bot は結果より先に 👀（eyes）を付ける (#101)。
 gh api "repos/$repo/issues/$n/reactions" \
-  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .created_at'
+  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]" and .content == "+1") | .created_at'
 ```
 
 ⚠ 実測（2026-08-31・`ginseng-core`）: **PR 236 本を 2 リクエストで並べ、👍 付き 45 本に絞れた**（既知の `#619` を含む）。⚠⚠ **既知の 1 件を拾えることを先に確かめてから件数を語ること。**
