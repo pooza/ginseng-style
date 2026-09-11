@@ -42,7 +42,8 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 - タグは [release.yml](../.github/workflows/release.yml) が打つ（`config/lib.yaml` の `package.version` が正本）。⚠⚠ **手順本体は [release-tag](../.github/actions/release-tag/action.yml) にあり、gem 側 7 本も同じものを `@<SHA>` で呼ぶ**（#65 / #75。⚠ タグは付け替えられるので SHA で固定する）
   - ⚠⚠ **引き金はリポジトリで違う。** このリポジトリは `mode: auto`（push＝出荷）、**gem 側 7 本は `mode: manual`（`workflow_dispatch` を人が押す）**。着手時バンプをするかどうかで決まる（[workflow.md](workflow.md) の「タグを手で打たない」）
   - 🔴 **押し忘れは [gem-watch](../.github/workflows/gem-watch.yml) の `releases` ジョブが週次で一覧に出す**（赤にはしない）
-- 古い版で止まっている利用側は、[gem-watch](../.github/workflows/gem-watch.yml) の `pins` ジョブが週次で出す
+- 古い版で止まっている利用側は、[gem-watch](../.github/workflows/gem-watch.yml) が週次で出す。`ginseng-style` の参照（gem 側 7 本）は `pins`、**アプリ側の `ginseng-*` 参照（#103）は `consumers`**。⚠⚠ **判定の規則が逆なので混ぜない** — lock を持たない gem 側では `tag:` が error、`revision:` を lock に持つアプリ側では `tag:` が正解
+  - 🔴 **`consumers` の対象一覧は `secrets.GEM_WATCH_CONSUMERS`**（private / 他 org の名前をここに書けないため）。⚠⚠ **`vars` にしない — step の `env:` はログに平文で出る**（[workflow.md](workflow.md)）
 - ⚠ **未固定（`@main` / `branch: 'main'`）は落とす。古いだけなら落とさない** — 配っている最中は必ず古い期間があり、そこで赤くすると「赤は無視するもの」になる
 
 ## ⚠ ginseng-* の利用者
