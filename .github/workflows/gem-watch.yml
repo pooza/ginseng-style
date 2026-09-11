@@ -259,20 +259,27 @@ jobs:
 
           # ① 各 gem の最新タグ。⚠ `.commit.sha` を使う — `git/refs/tags` の `.object.sha`
           #   は annotated タグでタグオブジェクトを指すので、コミットと照合できない。
-          declare -A tags latest latest_sha
+          # ⚠⚠ **「GEMS に無い」「タグが 1 本も無い」「取得できない」を分ける（Codex P2）。**
+          #   1 つにまとめると、タグが全部消えた gem への参照が「対象外」の warning に化け、
+          #   存在しない `tag:` まで緑のまま素通りする。
+          declare -A fetched tags latest latest_sha
           bad=0
           for g in $GEMS; do
             if ! t=$(GH_TOKEN=$TOKEN_1 gh api "repos/pooza/$g/tags" --paginate \
                        --jq '.[] | "\(.commit.sha) \(.name)"' 2>&1); then
               echo "::error::pooza/$g のタグ一覧を取得できない: $(printf '%s' "$t" | head -1)"
+              fetched[$g]=failed
               bad=1
               continue
             fi
-            t=$(printf '%s\n' "$t" | awk '$2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/')
-            [ -n "$t" ] || continue
-            tags[$g]=$t
-            latest[$g]=$(printf '%s\n' "$t" | awk '{print $2}' | sort -V | tail -1)
-            latest_sha[$g]=$(printf '%s\n' "$t" | awk -v n="${latest[$g]}" '$2 == n {print $1; exit}')
+            fetched[$g]=ok
+            # タグが無ければ空のまま。⚠ その gem への `tag:` / `ref:` は下で「タグが無い」の error になる。
+            tags[$g]=$(printf '%s\n' "$t" | awk '$2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/')
+            latest[$g]=なし
+            latest_sha[$g]=
+            [ -n "${tags[$g]}" ] || continue
+            latest[$g]=$(printf '%s\n' "${tags[$g]}" | awk '{print $2}' | sort -V | tail -1)
+            latest_sha[$g]=$(printf '%s\n' "${tags[$g]}" | awk -v n="${latest[$g]}" '$2 == n {print $1; exit}')
           done
 
           echo "| 利用側 | gem | 参照 | 最新 | |" >> "$GITHUB_STEP_SUMMARY"
@@ -366,11 +373,19 @@ jobs:
               br=$(key branch)
               where="$label の $g（$branch）"
 
-              if [ -z "${tags[$g]:-}" ]; then
-                echo "::warning::$where は見張りの対象外の gem（GEMS に無い / タグが無い）"
-                row "$g" - - '⚠ 対象外'
-                continue
-              fi
+              case "${fetched[$g]:-}" in
+                '')
+                  echo "::warning::$where は見張りの対象外の gem（GEMS に無い）"
+                  row "$g" - - '⚠ 対象外'
+                  continue
+                  ;;
+                failed)
+                  echo "::error::$where を判定できない（$g のタグ一覧を取得できない）"
+                  row "$g" - - '🔴 タグを取得できない'
+                  broken=$((broken + 1))
+                  continue
+                  ;;
+              esac
 
               if [ -n "$tag" ]; then
                 if ! printf '%s\n' "${tags[$g]}" | awk -v n="$tag" '$2 == n {f = 1} END {exit !f}'; then
