@@ -1,0 +1,19 @@
+{
+  "name": "ginseng-style",
+  "owner": {
+    "name": "Tatsuya Koishi",
+    "email": "tkoishi@b-shock.co.jp",
+    "url": "https://github.com/pooza"
+  },
+  "description": "ginseng-* 共通の手順をスキルとして配る",
+  "plugins": [
+    {
+      "name": "ginseng",
+      "source": "./plugins/ginseng",
+      "description": "ginseng-* 共通の手順（Codex のレビューの処理など）",
+      "homepage": "https://github.com/pooza/ginseng-style/blob/main/docs/skills.md",
+      "repository": "https://github.com/pooza/ginseng-style",
+      "license": "MIT"
+    }
+  ]
+}
