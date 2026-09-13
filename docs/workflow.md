@@ -287,14 +287,17 @@ steps:
 
 ⚠⚠ **`gem-watch` 自身が 60 日で止まる可能性は残る。** `ginseng-style` は管理拠点で活動が続く前提に乗っている。**完全に塞ぐには外部の cron から `gem-watch` の最終実行を見るしかない**ので、そこはリスクとして受け入れている。
 
-⚠ 動かすには `GEM_WATCH_TOKEN`（fine-grained PAT・対象 8 リポジトリ・Actions: Read and write / Metadata: Read）を `ginseng-style` の secret に置く。`GITHUB_TOKEN` は他リポジトリを起動できない。
+⚠ 動かすには `GEM_WATCH_DISPATCH_TOKEN`（fine-grained PAT・`pooza` 名義・対象 8 リポジトリ・Actions: Read and write / Contents: Read）を `ginseng-style` の secret に置く。`GITHUB_TOKEN` は他リポジトリを起動できない。
 
 `consumers` ジョブ（アプリ側の `ginseng-*` 参照。#103）は、さらに次の 2 つを secret に置く。
 
 | secret | 中身 |
 | --- | --- |
 | `GEM_WATCH_CONSUMERS` | 見張る利用側の `owner/repo` を空白区切りで。⚠⚠ **全リストはセッションメモリ側が正本** |
-| `GEM_WATCH_CONSUMERS_TOKEN` | `GEM_WATCH_TOKEN` で読めない利用側を読むトークン（Contents: Read）。⚠ fine-grained PAT は resource owner を 1 つしか持てないので、**他 org の private はこちら**。無ければ省略してよい（読めない利用側は error になる） |
+| `GEM_WATCH_READ_TOKEN` | `GEM_WATCH_DISPATCH_TOKEN` で読めない利用側を読むトークン（**Contents: Read のみ**）。⚠ fine-grained PAT は resource owner を 1 つしか持てないので、**他 org の private はこちら**。無ければ省略してよい（読めない利用側は error になる） |
+
+- ⚠⚠ **トークンの名前は org ではなく「任せている仕事」で付ける。** 🔴 **`dispatch` のほうにだけ `Actions: Read and write` が要るのは、各 gem の `test.yml` を起こすから** — `read` のほうは `Gemfile` を読むだけで何も起動しない。⚠ **org の差ではなく仕事の差**なので、揃えると**使わない書き込み権限を public リポジトリの secret に置く**ことになる
+  - 🔴 **名前を揃えなかった理由を書かないと「片方が設定を間違えている」と読まれる**（2026-09-13 に実際そう読まれた）
 
 - 🔴🔴 **一覧は `vars` ではなく `secrets` に置く。** private と他 org の名前はこの public なリポジトリに書けないが、⚠⚠ **step の `env:` はログにそのまま出る** — `vars` は平文、`secrets` だけが `***` になる（2026-09-07 の実行ログで確認）
 - 🔴 **ログとサマリにも名前を出さない。** 実名で出すのは **`pooza` の public リポジトリだけ**で、それ以外は `GEM_WATCH_CONSUMERS` の順番（伏せ字 #N）で示す。⚠ **`private` だけで判定しないこと** — 他 org にも public のリポジトリがあり、実名が出た（2026-09-11）

@@ -8,6 +8,15 @@ name: gem-watch
 # ⚠ この workflow 自身が 60 日で止まる可能性は残る。ginseng-style は管理拠点で
 #   活動が続く前提。詳細は docs/workflow.md。
 
+# ⚠⚠ トークンは 2 本ある。**名前は org ではなく「任せている仕事」で付けている。**
+#   GEM_WATCH_DISPATCH_TOKEN — pooza 名義。Contents: Read ＋ **Actions: Read and write**。
+#     ⚠ 書き込みが要るのは、各 gem の test.yml を workflow_dispatch で起こすため（上記 2.）。
+#   GEM_WATCH_READ_TOKEN     — 他 org 名義。**Contents: Read のみ**。
+#     ⚠ こちらは consumers ジョブが Gemfile を読むだけで、何も起動しない。
+# 🔴 **権限が違うのは org の差ではなく仕事の差。** 揃えると、使わない書き込み権限を
+#   public リポジトリの secret に置くことになるので揃えない。
+# ⚠ fine-grained PAT は resource owner を 1 つしか選べないので、org をまたぐと必ず 2 本になる。
+
 on:
   schedule:
     # ⚠ 各 gem の test（月曜 00:25 UTC）より後に置く
@@ -34,7 +43,7 @@ jobs:
     steps:
       - name: check workflow states
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
           bad=0
@@ -62,7 +71,7 @@ jobs:
       - name: dispatch tests
         if: ${{ !cancelled() }}
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
           bad=0
@@ -87,7 +96,7 @@ jobs:
     steps:
       - name: check pinned ginseng-style
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
 
@@ -241,9 +250,9 @@ jobs:
           # ⚠ 形は `owner/repo` の空白区切り。
           CONSUMERS: ${{ secrets.GEM_WATCH_CONSUMERS }}
           # ⚠ fine-grained PAT は resource owner を 1 つしか持てないので、他 org の private は
-          #   GEM_WATCH_TOKEN では読めない。読めるトークンを順に試す（どちらも無ければ error）。
-          TOKEN_1: ${{ secrets.GEM_WATCH_TOKEN }}
-          TOKEN_2: ${{ secrets.GEM_WATCH_CONSUMERS_TOKEN }}
+          #   pooza 名義のトークンでは読めない。読めるトークンを順に試す（どちらも無ければ error）。
+          TOKEN_1: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
+          TOKEN_2: ${{ secrets.GEM_WATCH_READ_TOKEN }}
         run: |
           set -uo pipefail
 
@@ -451,7 +460,7 @@ jobs:
     steps:
       - name: check whether v<version> is tagged
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
 
