@@ -313,15 +313,21 @@ jobs:
             branch=
             tok=
             meta=
+            # 🔴🔴 **トークンは「中身を読めるか」で選ぶ。** ⚠⚠ `repos/<owner>/<repo>` は
+            #   **public ならどのトークンでも読める**ので、これで選ぶと **Contents の権限が
+            #   無いトークンを掴んだまま次へ進む** — 2026-09-13 に他 org の public 1 本が
+            #   `compare` で HTTP 403 になり、**読めるトークンが secret にあるのに使われなかった**。
+            # ⚠ `contents/`（ルートの一覧）は Contents: Read が要るので、選定の踏み絵に使える。
             for t in "$TOKEN_1" "${TOKEN_2:-}"; do
               [ -n "$t" ] || continue
-              if meta=$(GH_TOKEN=$t gh api "repos/$repo" --jq '"\(.private) \(.default_branch)"' 2>/dev/null); then
-                tok=$t
-                break
-              fi
+              meta=$(GH_TOKEN=$t gh api "repos/$repo" --jq '"\(.private) \(.default_branch)"' 2>/dev/null) || continue
+              GH_TOKEN=$t gh api "repos/$repo/contents" --jq 'length' > /dev/null 2>&1 || continue
+              tok=$t
+              break
             done
             if [ -z "$tok" ]; then
-              echo "::error::$label（GEM_WATCH_CONSUMERS の $i 番目）を読めない（トークンの対象外 / 名前の誤り）"
+              # ⚠ 「見えない」と「無い」を分けない（404 は両方を同じ顔で返す）。
+              echo "::error::$label（GEM_WATCH_CONSUMERS の $i 番目）の中身を読めない（どちらのトークンにも Contents: Read が無い / 名前の誤り）"
               row - - - '🔴 読めない'
               broken=$((broken + 1))
               continue
