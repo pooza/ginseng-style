@@ -341,18 +341,25 @@ jobs:
             # ② 見るブランチ。⚠⚠ 「develop があればそちら」は誤り — 置き去りの develop が
             #   ある（2026-09-05 に実測）。**default より進んでいる develop だけを見る。**
             branch=$default
-            if ahead=$(GH_TOKEN=$tok gh api "repos/$repo/compare/$default...develop" --jq '.ahead_by' 2>&1); then
+            # ⚠⚠ **stderr は変数に混ぜず、別に捕まえる。** 2>&1 で受けると、成功した
+            #   ときの警告まで値に入り、`$ahead` の比較や Gemfile の解析が壊れる。
+            if ahead=$(GH_TOKEN=$tok gh api "repos/$repo/compare/$default...develop" \
+                         --jq '.ahead_by' 2> gh-err.txt); then
               [ "$ahead" -gt 0 ] && branch=develop
-            elif ! printf '%s' "$ahead" | grep -q '(HTTP 404)'; then
-              echo "::error::$label の develop と $default を比較できない"
+            elif ! grep -q '(HTTP 404)' gh-err.txt; then
+              # ⚠⚠ **gh の文言を捨てない。** 捨てると 403 と 500 と「develop が無い」の
+              #   区別が付かず、⚠ 直す側が「トークンが足りないのか壊れているのか」を
+              #   測り直すところからやり直すことになる（2026-09-13 に実際そうなった）。
+              # ⚠ 名前は add-mask 済みだが、念のため gh の要約（最後の 1 行）だけにする。
+              echo "::error::$label の develop と $default を比較できない: $(tail -1 gh-err.txt)"
               row - - - '🔴 読めない'
               broken=$((broken + 1))
               continue
             fi
 
             if ! gemfile=$(GH_TOKEN=$tok gh api -H 'Accept: application/vnd.github.raw' \
-                             "repos/$repo/contents/Gemfile?ref=$branch" 2>/dev/null); then
-              echo "::error::$label の Gemfile（$branch）を読めない"
+                             "repos/$repo/contents/Gemfile?ref=$branch" 2> gh-err.txt); then
+              echo "::error::$label の Gemfile（$branch）を読めない: $(tail -1 gh-err.txt)"
               row - - - '🔴 Gemfile を読めない'
               broken=$((broken + 1))
               continue
