@@ -287,7 +287,22 @@ steps:
 
 ⚠⚠ **`gem-watch` 自身が 60 日で止まる可能性は残る。** `ginseng-style` は管理拠点で活動が続く前提に乗っている。**完全に塞ぐには外部の cron から `gem-watch` の最終実行を見るしかない**ので、そこはリスクとして受け入れている。
 
-⚠ 動かすには `GEM_WATCH_TOKEN`（fine-grained PAT・対象 8 リポジトリ・Actions: Read and write / Metadata: Read）を `ginseng-style` の secret に置く。`GITHUB_TOKEN` は他リポジトリを起動できない。
+⚠ 動かすには `GEM_WATCH_DISPATCH_TOKEN`（fine-grained PAT・`pooza` 名義・対象 8 リポジトリ・Actions: Read and write / Contents: Read）を `ginseng-style` の secret に置く。`GITHUB_TOKEN` は他リポジトリを起動できない。
+
+`consumers` ジョブ（アプリ側の `ginseng-*` 参照。#103）は、さらに次の 2 つを secret に置く。
+
+| secret | 中身 |
+| --- | --- |
+| `GEM_WATCH_CONSUMERS` | 見張る利用側の `owner/repo` を空白区切りで。⚠⚠ **全リストはセッションメモリ側が正本** |
+| `GEM_WATCH_READ_TOKEN` | `GEM_WATCH_DISPATCH_TOKEN` で読めない利用側を読むトークン（**Contents: Read のみ**）。⚠ fine-grained PAT は resource owner を 1 つしか持てないので、**他 org の private はこちら**。無ければ省略してよい（読めない利用側は error になる） |
+
+- ⚠⚠ **トークンの名前は org ではなく「任せている仕事」で付ける。** 🔴 **`dispatch` のほうにだけ `Actions: Read and write` が要るのは、各 gem の `test.yml` を起こすから** — `read` のほうは `Gemfile` を読むだけで何も起動しない。⚠ **org の差ではなく仕事の差**なので、揃えると**使わない書き込み権限を public リポジトリの secret に置く**ことになる
+  - 🔴 **名前を揃えなかった理由を書かないと「片方が設定を間違えている」と読まれる**（2026-09-13 に実際そう読まれた）
+
+- 🔴🔴 **一覧は `vars` ではなく `secrets` に置く。** private と他 org の名前はこの public なリポジトリに書けないが、⚠⚠ **step の `env:` はログにそのまま出る** — `vars` は平文、`secrets` だけが `***` になる（2026-09-07 の実行ログで確認）
+- 🔴 **ログとサマリにも名前を出さない。** 実名で出すのは **`pooza` の public リポジトリだけ**で、それ以外は `GEM_WATCH_CONSUMERS` の順番（伏せ字 #N）で示す。⚠ **`private` だけで判定しないこと** — 他 org にも public のリポジトリがあり、実名が出た（2026-09-11）
+- ⚠ **見るブランチは「既定より進んでいる `develop`」、無ければ既定。** 「`develop` があればそちら」は誤り（置き去りの `develop` がある）
+- ⚠⚠ **いまは未固定を warning にしている**（#103 の PR はマージが相手の判断で、配っている最中は必ず未固定の期間がある）。**全部マージされたら error へ上げる**（#75 の `tag:` と同じ段取り）
 
 - **週次の `schedule:` を必ず置く。** ⚠ push 契機だけだと、更新が止まった gem は永遠に緑のまま赤に気づけない。実例: `ginseng-postgres` の CI は 4 ヶ月赤のまま誰も気づかなかった
 - ⚠ **`schedule:` はデフォルトブランチでしか動かない。** feature ブランチに置いても発火しない
@@ -329,7 +344,7 @@ steps:
 
 `Gemfile.lock` は git 参照のリビジョンを固定するので、**リポジトリごとに違う版が刺さったまま何ヶ月も進む**。security 修正が一部にしか届いていない状態になりやすい。定期的に横断で棚卸しする。
 
-⚠ **`ginseng-style` は別扱い**（上記「参照は必ず版で固定する」）。刺さっている版は `Gemfile` の `tag:` に書いてあり、古いものは週次の [gem-watch](../.github/workflows/gem-watch.yml) が出す。⚠⚠ **`ginseng-core` などライブラリ本体は、いまも `Gemfile.lock` 頼りのまま**なので、下の棚卸しが要る。
+⚠ **`ginseng-style` は別扱い**（上記「参照は必ず版で固定する」）。刺さっている版は `Gemfile` の `tag:` に書いてあり、古いものは週次の [gem-watch](../.github/workflows/gem-watch.yml) が出す。⚠⚠ **`ginseng-core` などライブラリ本体は #103 でアプリ側から `tag:` 固定へ移している途中**で、固定したものは `gem-watch` の `consumers` ジョブが週次で出す。🔴 **利用側の dependabot は 9 本中 7 本が `lockfile-only` で、`Gemfile` の `tag:` を書き換えない**（2026-09-11 実測）ので、⚠⚠ **固定した版の古さに気づく口は `consumers` だけ**。移り終わるまでは下の棚卸しも要る。
 
 ```sh
 for d in ~/repos/*/; do

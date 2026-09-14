@@ -8,6 +8,15 @@ name: gem-watch
 # ⚠ この workflow 自身が 60 日で止まる可能性は残る。ginseng-style は管理拠点で
 #   活動が続く前提。詳細は docs/workflow.md。
 
+# ⚠⚠ トークンは 2 本ある。**名前は org ではなく「任せている仕事」で付けている。**
+#   GEM_WATCH_DISPATCH_TOKEN — pooza 名義。Contents: Read ＋ **Actions: Read and write**。
+#     ⚠ 書き込みが要るのは、各 gem の test.yml を workflow_dispatch で起こすため（上記 2.）。
+#   GEM_WATCH_READ_TOKEN     — 他 org 名義。**Contents: Read のみ**。
+#     ⚠ こちらは consumers ジョブが Gemfile を読むだけで、何も起動しない。
+# 🔴 **権限が違うのは org の差ではなく仕事の差。** 揃えると、使わない書き込み権限を
+#   public リポジトリの secret に置くことになるので揃えない。
+# ⚠ fine-grained PAT は resource owner を 1 つしか選べないので、org をまたぐと必ず 2 本になる。
+
 on:
   schedule:
     # ⚠ 各 gem の test（月曜 00:25 UTC）より後に置く
@@ -34,7 +43,7 @@ jobs:
     steps:
       - name: check workflow states
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
           bad=0
@@ -62,7 +71,7 @@ jobs:
       - name: dispatch tests
         if: ${{ !cancelled() }}
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
           bad=0
@@ -87,7 +96,7 @@ jobs:
     steps:
       - name: check pinned ginseng-style
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
 
@@ -222,6 +231,238 @@ jobs:
 
           exit $bad
 
+  # ⚠⚠ #103 でアプリ側の `ginseng-*` 参照を `tag:` 固定へ移した。`pins` と同じ構造で、
+  # 固定した以上「いつまでも古いまま」は見張らないと誰も気付かない。🔴 しかも利用側の
+  # dependabot は 9 本中 7 本が `lockfile-only` で、**`Gemfile` の `tag:` を書き換えない**
+  # （2026-09-11 実測）。⚠⚠ **7 本ではここが唯一の気づき口になる。**
+  #
+  # ⚠ `pins` に混ぜないのは、判定の規則が逆だから。`pins` は gem 側（lock を持たない）の
+  # composite action と `Gemfile` を見ていて、`tag:` を error にしている（#75）。
+  # アプリ側は `Gemfile.lock` が `revision:` を併記するので、**`tag:` が正解**になる。
+  consumers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check pinned ginseng-* in consumers
+        env:
+          # 🔴🔴 **対象の一覧は vars ではなく secrets に置く。** private と他 org の名前は
+          #   public なこのファイルに書けないが、**step の env: はログにそのまま出る**。
+          #   vars は平文で、secrets だけが *** になる（2026-09-07 の実行ログで確認）。
+          # ⚠ 形は `owner/repo` の空白区切り。
+          CONSUMERS: ${{ secrets.GEM_WATCH_CONSUMERS }}
+          # ⚠ fine-grained PAT は resource owner を 1 つしか持てないので、他 org の private は
+          #   pooza 名義のトークンでは読めない。読めるトークンを順に試す（どちらも無ければ error）。
+          TOKEN_1: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
+          TOKEN_2: ${{ secrets.GEM_WATCH_READ_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          echo "## 利用側の \`ginseng-*\` の固定状況（#103）" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "${CONSUMERS// /}" ]; then
+            # ⚠⚠ 「一覧が無い」を「見張る先が無い」と読まない。見張らないまま緑になる。
+            echo "::error::secrets.GEM_WATCH_CONSUMERS が空。利用側を見張れない"
+            echo "🔴 \`GEM_WATCH_CONSUMERS\` が空" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # ① 各 gem の最新タグ。⚠ `.commit.sha` を使う — `git/refs/tags` の `.object.sha`
+          #   は annotated タグでタグオブジェクトを指すので、コミットと照合できない。
+          # ⚠⚠ **「GEMS に無い」「タグが 1 本も無い」「取得できない」を分ける（Codex P2）。**
+          #   1 つにまとめると、タグが全部消えた gem への参照が「対象外」の warning に化け、
+          #   存在しない `tag:` まで緑のまま素通りする。
+          declare -A fetched tags latest latest_sha
+          bad=0
+          for g in $GEMS; do
+            if ! t=$(GH_TOKEN=$TOKEN_1 gh api "repos/pooza/$g/tags" --paginate \
+                       --jq '.[] | "\(.commit.sha) \(.name)"' 2>&1); then
+              echo "::error::pooza/$g のタグ一覧を取得できない: $(printf '%s' "$t" | head -1)"
+              fetched[$g]=failed
+              bad=1
+              continue
+            fi
+            fetched[$g]=ok
+            # タグが無ければ空のまま。⚠ その gem への `tag:` / `ref:` は下で「タグが無い」の error になる。
+            tags[$g]=$(printf '%s\n' "$t" | awk '$2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/')
+            latest[$g]=なし
+            latest_sha[$g]=
+            [ -n "${tags[$g]}" ] || continue
+            latest[$g]=$(printf '%s\n' "${tags[$g]}" | awk '{print $2}' | sort -V | tail -1)
+            latest_sha[$g]=$(printf '%s\n' "${tags[$g]}" | awk -v n="${latest[$g]}" '$2 == n {print $1; exit}')
+          done
+
+          echo "| 利用側 | gem | 参照 | 最新 | |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+
+          stale=0
+          unpinned=0
+          broken=0
+          # 表とメッセージを同じ 1 箇所から出す。$label は名前を出してよいときだけ実名。
+          # 見たブランチも出す（develop を見たか既定を見たかで意味が変わる）。
+          row() {
+            g1=$1; [ "$g1" = - ] || g1="\`$g1\`"
+            echo "| $label${branch:+（$branch）} | $g1 | $2 | $3 | $4 |" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          i=0
+          for repo in $CONSUMERS; do
+            i=$((i + 1))
+            # 🔴🔴 **pooza の public と確かめられるまでは名前を出さない。** 読めなかったものは
+            #   private と同じに扱う（404 は「無い」と「見えない」を区別しない）。
+            label="伏せ字 #$i"
+            branch=
+            tok=
+            meta=
+            # 🔴🔴 **トークンは「中身を読めるか」で選ぶ。** ⚠⚠ `repos/<owner>/<repo>` は
+            #   **public ならどのトークンでも読める**ので、これで選ぶと **Contents の権限が
+            #   無いトークンを掴んだまま次へ進む** — 2026-09-13 に他 org の public 1 本が
+            #   `compare` で HTTP 403 になり、**読めるトークンが secret にあるのに使われなかった**。
+            # ⚠ `contents/`（ルートの一覧）は Contents: Read が要るので、選定の踏み絵に使える。
+            for t in "$TOKEN_1" "${TOKEN_2:-}"; do
+              [ -n "$t" ] || continue
+              meta=$(GH_TOKEN=$t gh api "repos/$repo" --jq '"\(.private) \(.default_branch)"' 2>/dev/null) || continue
+              GH_TOKEN=$t gh api "repos/$repo/contents" --jq 'length' > /dev/null 2>&1 || continue
+              tok=$t
+              break
+            done
+            if [ -z "$tok" ]; then
+              # ⚠ 「見えない」と「無い」を分けない（404 は両方を同じ顔で返す）。
+              echo "::error::$label（GEM_WATCH_CONSUMERS の $i 番目）の中身を読めない（どちらのトークンにも Contents: Read が無い / 名前の誤り）"
+              row - - - '🔴 読めない'
+              broken=$((broken + 1))
+              continue
+            fi
+            read -r private default <<< "$meta"
+            # 🔴 **他 org の名前は public でも出さない**（docs/CLAUDE.md）。⚠ 実例: 他 org に
+            #   public のリポジトリがあり、`private` だけで判定すると実名が出た（2026-09-11）。
+            if [ "$private" = false ] && [ "${repo%%/*}" = pooza ]; then
+              label=$repo
+            else
+              # ⚠ 念のためログからも消す。gh のエラー文言は URL に名前を含む。
+              echo "::add-mask::$repo"
+              echo "::add-mask::${repo#*/}"
+              [ "${repo%%/*}" = pooza ] || echo "::add-mask::${repo%%/*}"
+            fi
+
+            # ② 見るブランチ。⚠⚠ 「develop があればそちら」は誤り — 置き去りの develop が
+            #   ある（2026-09-05 に実測）。**default より進んでいる develop だけを見る。**
+            branch=$default
+            # ⚠⚠ **stderr は変数に混ぜず、別に捕まえる。** 2>&1 で受けると、成功した
+            #   ときの警告まで値に入り、`$ahead` の比較や Gemfile の解析が壊れる。
+            if ahead=$(GH_TOKEN=$tok gh api "repos/$repo/compare/$default...develop" \
+                         --jq '.ahead_by' 2> gh-err.txt); then
+              [ "$ahead" -gt 0 ] && branch=develop
+            elif ! grep -q '(HTTP 404)' gh-err.txt; then
+              # ⚠⚠ **gh の文言を捨てない。** 捨てると 403 と 500 と「develop が無い」の
+              #   区別が付かず、⚠ 直す側が「トークンが足りないのか壊れているのか」を
+              #   測り直すところからやり直すことになる（2026-09-13 に実際そうなった）。
+              # ⚠ 名前は add-mask 済みだが、念のため gh の要約（最後の 1 行）だけにする。
+              echo "::error::$label の develop と $default を比較できない: $(tail -1 gh-err.txt)"
+              row - - - '🔴 読めない'
+              broken=$((broken + 1))
+              continue
+            fi
+
+            if ! gemfile=$(GH_TOKEN=$tok gh api -H 'Accept: application/vnd.github.raw' \
+                             "repos/$repo/contents/Gemfile?ref=$branch" 2> gh-err.txt); then
+              echo "::error::$label の Gemfile（$branch）を読めない: $(tail -1 gh-err.txt)"
+              row - - - '🔴 Gemfile を読めない'
+              broken=$((broken + 1))
+              continue
+            fi
+
+            # ③ `gem 'ginseng-*'` の宣言を 1 本ずつ畳む。⚠⚠ **宣言は複数行にまたがる**
+            #   （`tag:` を足すと Layout/LineLength に当たるので折っている）。
+            decls=$(printf '%s\n' "$gemfile" | awk '
+              {
+                if (!f && $0 ~ /^[[:space:]]*gem[[:space:]]+.ginseng-/) { f = 1; buf = $0 }
+                else if (f) { buf = buf " " $0 }
+                if (f && $0 !~ /,[[:space:]]*$/) { print buf; f = 0 }
+              }')
+            if [ -z "$decls" ]; then
+              # ⚠ 一覧に載っているのに参照が無いのは、一覧か読み方のどちらかが壊れている。
+              echo "::error::$label の Gemfile（$branch）に ginseng-* の宣言が無い"
+              row - - - '🔴 宣言なし'
+              broken=$((broken + 1))
+              continue
+            fi
+
+            while IFS= read -r d; do
+              g=$(printf '%s' "$d" | sed -n "s/^[[:space:]]*gem[[:space:]]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p")
+              key() { printf '%s' "$d" | sed -n "s/.*[^a-z_]$1:[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p"; }
+              tag=$(key tag)
+              ref=$(key ref)
+              br=$(key branch)
+              where="$label の $g（$branch）"
+
+              case "${fetched[$g]:-}" in
+                '')
+                  echo "::warning::$where は見張りの対象外の gem（GEMS に無い）"
+                  row "$g" - - '⚠ 対象外'
+                  continue
+                  ;;
+                failed)
+                  echo "::error::$where を判定できない（$g のタグ一覧を取得できない）"
+                  row "$g" - - '🔴 タグを取得できない'
+                  broken=$((broken + 1))
+                  continue
+                  ;;
+              esac
+
+              if [ -n "$tag" ]; then
+                if ! printf '%s\n' "${tags[$g]}" | awk -v n="$tag" '$2 == n {f = 1} END {exit !f}'; then
+                  echo "::error::$where が存在しないタグ $tag を参照している"
+                  row "$g" "\`$tag\`" "\`${latest[$g]}\`" '🔴 タグが無い'
+                  broken=$((broken + 1))
+                elif [ "$tag" != "${latest[$g]}" ]; then
+                  echo "::warning::$where は $tag（最新は ${latest[$g]}）"
+                  row "$g" "\`$tag\`" "\`${latest[$g]}\`" '🟡 古い'
+                  stale=$((stale + 1))
+                else
+                  row "$g" "\`$tag\`" "\`${latest[$g]}\`" '✅'
+                fi
+              elif [ -n "$ref" ]; then
+                # ⚠ 短縮 SHA も許す。どのタグも指していない SHA はレビューを通っていない。
+                t=$(printf '%s\n' "${tags[$g]}" | awk -v s="$ref" 'index($1, s) == 1 {print $2; exit}')
+                if ! printf '%s' "$ref" | grep -Eq '^[0-9a-f]{7,40}$' || [ -z "$t" ]; then
+                  echo "::error::$where が ref: $ref を参照しているが、対応するタグが無い"
+                  row "$g" "\`$ref\`" "\`${latest[$g]}\`" '🔴 タグの無い ref'
+                  broken=$((broken + 1))
+                elif [ "${latest_sha[$g]#"$ref"}" = "${latest_sha[$g]}" ]; then
+                  echo "::warning::$where は $ref（$t。最新は ${latest[$g]}）"
+                  row "$g" "\`${ref:0:10}\`（$t）" "\`${latest[$g]}\`" '🟡 古い'
+                  stale=$((stale + 1))
+                else
+                  row "$g" "\`${ref:0:10}\`（$t）" "\`${latest[$g]}\`" '✅'
+                fi
+              elif printf '%s' "$d" | grep -Eq '(github|git):'; then
+                # ⚠⚠ **いまは warning。** #103 の PR はマージが相手の判断で、配っている最中は
+                #   必ず未固定の期間がある。ここで赤くすると「赤は無視するもの」になる。
+                #   **全部マージされたら error へ上げる**（#75 の `tag:` と同じ段取り）。
+                if [ -n "$br" ]; then pin="branch: $br"; else pin='ref なし'; fi
+                echo "::warning::$where が未固定（$pin）"
+                row "$g" "\`$pin\`" "\`${latest[$g]}\`" '⚠ 未固定'
+                unpinned=$((unpinned + 1))
+              else
+                echo "::error::$where が git 参照ではない（形を読めない）"
+                row "$g" - "\`${latest[$g]}\`" '🔴 形を読めない'
+                broken=$((broken + 1))
+              fi
+            done <<< "$decls"
+          done
+
+          # ⚠ warning は流れて消える。週次の一覧はサマリが正本。「古い」「未固定」「壊れ」は
+          #   別に数える — 混ぜると、赤の理由がサマリから読めなくなる。
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🟡 古い（タグ / SHA が最新でない）: $stale 件" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ⚠ 未固定（branch: / ref なし）: $unpinned 件" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🔴 壊れている（読めない / タグが無い / 形を読めない）: $broken 件" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "⚠ private と他 org のリポジトリは名前を出さず、\`GEM_WATCH_CONSUMERS\` の順番（伏せ字 #N）で示す" >> "$GITHUB_STEP_SUMMARY"
+
+          [ "$broken" -eq 0 ] || bad=1
+          exit $bad
+
   # ⚠⚠ #65 で gem 側 7 本のタグを `workflow_dispatch` 契機にした。押すのは人なので、
   # **押し忘れは自動では直らない**。⚠ これは仮定ではない — 2026-08-27 時点で
   # `ginseng-core` は version 1.22.0 に対しタグが v1.20.0（security 修正 #580 / #582
@@ -232,7 +473,7 @@ jobs:
     steps:
       - name: check whether v<version> is tagged
         env:
-          GH_TOKEN: ${{ secrets.GEM_WATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
         run: |
           set -uo pipefail
 
