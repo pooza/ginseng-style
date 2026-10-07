@@ -40,7 +40,7 @@ Gem::Specification.new do |spec|
   #   （docs/CLAUDE.md の「⚠ 設定を変えるときの手順」）。⚠ 上げ時の合図は
   #   gem-watch の `linters` ジョブが週次で一覧に出す（赤にはしない）。
   spec.add_dependency 'rubocop', '~> 1.91.0'
-  spec.add_dependency 'rubocop-minitest', '~> 0.40.0'
+  spec.add_dependency 'rubocop-minitest', '~> 0.41.0'
   spec.add_dependency 'rubocop-performance', '~> 1.27.0'
   spec.add_dependency 'rubocop-rake', '~> 0.7.1'
 end
