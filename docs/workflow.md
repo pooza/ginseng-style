@@ -410,6 +410,18 @@ for d in ~/repos/*/; do
 done
 ```
 
+## Ruby のパッチ版に追従する
+
+**急がないが、放置もしない。** 起点は `ginseng-style` の追跡 Issue（`rollout` ラベル。4.0.7 は #114、4.0.9 は #131）。
+
+- ⚠⚠ **リリース告知ではなく default gem の版差を見る。** 4.0.7 は告知に CVE が無かったが、同梱の resolv が CVE を直していた（#114）
+- 🔴 **順番は「サーバー → アプリ側の `.ruby-version`」。** 逆にすると起動しない。サーバー側が終わったら追跡 Issue にコメントがあり、それを合図に PR を配る
+- 🔴 **`.ruby-version` を上げる PR で、`Gemfile.lock` の `BUNDLED WITH` もその Ruby に同梱の bundler へそろえる** (#131)。同梱の版は `RBENV_VERSION=<版> gem list bundler` の `default:` の先頭で確かめ、`bundle update --bundler=<その版>` で書き換える
+  - ⚠ **そろえないと、サーバーの `bundle install` の前に `gem install bundler -v <lock の版>` が要る。** 実例: mulukhiya-toot-proxy 5.43.0 は lock が 4.0.18 のまま 4.0.9（同梱は 4.0.20）へ上げ、ステージング・本番 8 台すべてで手で入れた
+  - ⚠ **`BUNDLED WITH` は手元の bundler の版が書き込まれるだけで、Ruby の更新とは連動しない。** 2026-10-28 の実測で公開アプリ 7 本は 4.0.10 / 4.0.17 / 4.0.20 の 3 種類に分かれていた
+  - ⚠ **Ruby を上げない回は `BUNDLED WITH` を動かさない**（動いていたら差分で気づく）
+- ⚠ **`ginseng-style` の配布物（`TargetRubyVersion` / `required_ruby_version`）はパッチ版では動かない。** バンプしない。gem 側の CI は `4.0` の浮動指定なので作業は要らない
+
 ## Codex のレビュー
 
 🔴 **正本はスキルに移した (#104)** — [plugins/ginseng/skills/codex-review/SKILL.md](../plugins/ginseng/skills/codex-review/SKILL.md)。採否の判断・👎 の規律・「指摘なし」の 3 通り・取り残しの走査・待機ループの組み方は、すべてそちらにある。
