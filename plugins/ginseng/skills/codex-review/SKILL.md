@@ -91,6 +91,16 @@ PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて�
 | **指摘なし** | **issue コメント**1 本（`Didn't find any major issues.`）。⚠ **review は作られない** |
 | 🔴 **指摘なし** | **PR 本体への 👍**（`issues/N/reactions` の bot の `+1`）。⚠⚠ **review でもコメントでもない** |
 | 🔴🔴 **まだ結果ではない** | **PR 本体への 👀**（同じ `issues/N/reactions` の `eyes`）。⚠⚠ **「読み始めた」の合図で、成果物ではない** |
+| 🔴🔴 **結果ではなく、巡の状態** | **要約コメント**1 本（`issues/N/comments`・本文の先頭が `<!-- codex-pull-request-review-summary -->`）。⚠⚠ **巡のたびに同じコメントを書き換える**（下記） |
+
+🔴 **要約コメントは成果物として数えない。** 指摘でも「指摘なし」でもなく、**実行中（Status が Running）のうちから在る**。⚠⚠ `issues/N/comments` を bot の login だけで絞ると、上の「指摘なし」の 1 本と区別できない — **本文の先頭の印で外す**。
+
+> 実測（[pooza/capsicum#1333](https://github.com/pooza/capsicum/pull/1333#issuecomment-6395647284)）: `created_at` 08:55・`updated_at` 09:25 の **1 本**が巡を表していた。⚠ `ginseng-core#731` / `#732`（2026-10-25）にも同じ形で付いている。⚠⚠ **「bot の issue コメントが在る」「件数が増えた」で待つと、1 巡目は Running の時点で抜け、2 巡目以降は件数が増えないので抜けない**
+
+- 使うなら、本文の隠しの状態 `<!-- codex-review-state:v1 {...} -->` の JSON を読む。`code_review.status == "completed"` **かつ** `code_review.commit_sha` が待っている SHA と一致する
+  - ⚠ `@codex security review` で起こした巡は `security_review` 側に入る（`code_review` と同じ形）
+  - ⚠ これは「**巡が終わった**」の合図であって、指摘の中身ではない。中身は上の経路で取る。⚠ `has_any_findings` / `has_unresolved_findings` は**その巡のものか PR 全体のものかを測っていない**ので、判定に使わない
+- ⚠⚠ **`created_at` は巡を指さない**（書き換えなので最初の巡の時刻のまま）。基点との比較は **`commit_sha`**、使うなら `updated_at`
 
 ⚠ Codex 自身の説明文がそう言っている — *"If Codex has suggestions, it will comment; otherwise it will react with 👍."*
 
@@ -115,6 +125,7 @@ PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて�
   - **巡を起こす前に基点を採る。** 各経路の**件数と最大 id**、👍 は **`created_at`**。⚠ 終了条件は「**基点より新しい bot の成果物が在るか**」
   - ⚠ **基点は自分の返信より前に置く。** 後ろに置いて P1 を一度取りこぼした（`pooza/ginseng-core#612`）
   - ⚠ **👍 の「在る／無い」は基点に使えない**（1 ユーザー 1 個で増えないため）。使えるのは `created_at` だけ
+  - 🔴 **issue コメントの件数と最大 id からは要約コメントを外す**（上記「要約コメントは成果物として数えない」）。⚠⚠ 1 本を書き換えるので、**件数にも最大 id にも巡が現れない**
 - ⚠ **応答が無いことを数分で判断しない。** Codex は遅れて届く
 - ⚠⚠ **「繋がっていない」を報告する前に、無いことの測り方が正しいか確かめる**
 - 直せるものは修正 PR、**当てられない／この PR では直さない**ものは Issue を立ててから返信する（⚠ 返信に番号を書く）。⚠⚠ **成立しない指摘にだけは Issue が要らない** — 👎 と反証の返信で完了（上記「採否を決める」）
