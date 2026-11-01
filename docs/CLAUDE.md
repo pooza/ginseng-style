@@ -46,7 +46,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
   - 🔴 **押し忘れは [gem-watch](../.github/workflows/gem-watch.yml) の `releases` ジョブが週次で一覧に出す**（赤にはしない）
 - 古い版で止まっている利用側は、[gem-watch](../.github/workflows/gem-watch.yml) が週次で出す。`ginseng-style` の参照（gem 側 7 本）は `pins`、**アプリ側の `ginseng-*` 参照（#103）は `consumers`**。⚠⚠ **判定の規則が逆なので混ぜない** — lock を持たない gem 側では `tag:` が error、`revision:` を lock に持つアプリ側では `tag:` が正解
   - 🔴 **`consumers` の対象一覧は `secrets.GEM_WATCH_CONSUMERS`**（private / 他 org の名前をここに書けないため）。⚠⚠ **`vars` にしない — step の `env:` はログに平文で出る**（[workflow.md](workflow.md)）
-- ⚠ **未固定（`@main` / `branch: 'main'`）は落とす。古いだけなら落とさない** — 配っている最中は必ず古い期間があり、そこで赤くすると「赤は無視するもの」になる
+- ⚠ **`pins` では未固定（`@main` / `branch: 'main'`）を落とす。古いだけなら落とさない** — 配っている最中は必ず古い期間があり、そこで赤くすると「赤は無視するもの」になる。⚠ **`consumers` の未固定は warning 止まり**（固定しないと決めた利用側がある。#103）
 
 ## ⚠ ginseng-* の利用者
 
