@@ -296,6 +296,10 @@ jobs:
 
           stale=0
           unpinned=0
+          by_choice=0
+          # ⚠ 固定しないと決めたリポジトリ（2026-09-17 のオーナー判断。#103）。追随は tomato-shrieker の
+          #   同期手順のピン棚卸しで見るので、warning にしない。⚠ 固定したら、ここから消す。
+          unpinned_by_choice='pooza/tomato-shrieker pooza/loquat pooza/shooby-do-bop pooza/dqdai-anniv'
           broken=0
           # 表とメッセージを同じ 1 箇所から出す。$label は名前を出してよいときだけ実名。
           # 見たブランチも出す（develop を見たか既定を見たかで意味が変わる）。
@@ -436,13 +440,17 @@ jobs:
                   row "$g" "\`${ref:0:10}\`（$t）" "\`${latest[$g]}\`" '✅'
                 fi
               elif printf '%s' "$d" | grep -Eq '(github|git):'; then
-                # ⚠⚠ **いまは warning。** #103 の PR はマージが相手の判断で、配っている最中は
-                #   必ず未固定の期間がある。ここで赤くすると「赤は無視するもの」になる。
-                #   **全部マージされたら error へ上げる**（#75 の `tag:` と同じ段取り）。
+                # ⚠ **error にしない (#103)。** 固定しないと決めたリポジトリがあるので、赤くすると
+                #   週次が赤のまま止まる。
                 if [ -n "$br" ]; then pin="branch: $br"; else pin='ref なし'; fi
-                echo "::warning::$where が未固定（$pin）"
-                row "$g" "\`$pin\`" "\`${latest[$g]}\`" '⚠ 未固定'
-                unpinned=$((unpinned + 1))
+                if [[ " $unpinned_by_choice " == *" $repo "* ]]; then
+                  row "$g" "\`$pin\`" "\`${latest[$g]}\`" '➖ 固定しない'
+                  by_choice=$((by_choice + 1))
+                else
+                  echo "::warning::$where が未固定（$pin）"
+                  row "$g" "\`$pin\`" "\`${latest[$g]}\`" '⚠ 未固定'
+                  unpinned=$((unpinned + 1))
+                fi
               else
                 echo "::error::$where が git 参照ではない（形を読めない）"
                 row "$g" - "\`${latest[$g]}\`" '🔴 形を読めない'
@@ -456,6 +464,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- 🟡 古い（タグ / SHA が最新でない）: $stale 件" >> "$GITHUB_STEP_SUMMARY"
           echo "- ⚠ 未固定（branch: / ref なし）: $unpinned 件" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ➖ 固定しないと決めたもの: $by_choice 件" >> "$GITHUB_STEP_SUMMARY"
           echo "- 🔴 壊れている（読めない / タグが無い / 形を読めない）: $broken 件" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "⚠ private と他 org のリポジトリは名前を出さず、\`GEM_WATCH_CONSUMERS\` の順番（伏せ字 #N）で示す" >> "$GITHUB_STEP_SUMMARY"
