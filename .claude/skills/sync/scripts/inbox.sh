@@ -8,14 +8,15 @@ set -uo pipefail
 
 since=${1:-$(date -d '7 days ago' +%F)}
 gems=(ginseng-style ginseng-core ginseng-fediverse ginseng-web ginseng-redis ginseng-postgres ginseng-piefed ginseng-youtube)
-failed=0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
+# ⚠ サブシェルやコマンド置換の中でも失敗を残すので、変数ではなくファイルに記録する。
+# ⚠ 文言は stderr へ。stdout だとコマンド置換の値に混ざる
 q() {
   if ! timeout -k 5 60 gh "$@"; then
-    echo "🔴 取得失敗: gh $*"
-    failed=1
+    echo "🔴 取得失敗: gh $*" >&2
+    : > "$tmp/failed"
   fi
 }
 
@@ -50,7 +51,6 @@ done
 # ⚠ 依頼は相手のリポジトリから参照の形で来ることがある。gem の名前で探すので、自分の告知も混ざる
 echo
 echo "## $since 以降に更新された、ginseng-* を参照する open Issue（gem 側を除く）"
-# ⚠ パイプに直接つなぐと q がサブシェルで動き、failed が消える
 {
   q search issues 'pooza/ginseng' --owner pooza --state open --updated ">=$since" --limit 100 --json repository,number,title,updatedAt \
     --jq '.[]|select(.repository.name|startswith("ginseng")|not)|"\(.repository.nameWithOwner)#\(.number) \(.updatedAt[:10]) \(.title)"'
@@ -58,8 +58,7 @@ echo "## $since 以降に更新された、ginseng-* を参照する open Issue�
     q search issues 'pooza/ginseng' --repo "$r" --state open --updated ">=$since" --limit 100 --json repository,number,title,updatedAt \
       --jq '.[]|"\(.repository.nameWithOwner)#\(.number) \(.updatedAt[:10]) \(.title)"'
   done
-} > "$tmp/refs"
-sort -u "$tmp/refs"
+} | sort -u
 
 echo
 echo "## 出荷（version ＝ 最新タグか）"
@@ -68,7 +67,7 @@ for g in "${gems[@]}"; do
   tag=$(q api "repos/pooza/$g/tags?per_page=100" --jq '.[].name' | sort -V | tail -1)
   if [ -z "$version" ] || [ -z "$tag" ]; then
     echo "🔴 $g を判定できない（version=$version tag=$tag）"
-    failed=1
+    : > "$tmp/failed"
   elif [ "v$version" = "$tag" ]; then
     echo "$g v$version"
   else
@@ -93,7 +92,7 @@ if [[ $run =~ ^[0-9]+ ]] && q api "repos/pooza/ginseng-style/actions/runs/${BASH
   grep -rhE '##\[(warning|error)\]' "$tmp/logs" | sed -E 's/^[^ ]+ //' | sort -u
 else
   echo "🔴 gem-watch のログを読めない"
-  failed=1
+  : > "$tmp/failed"
 fi
 
-exit "$failed"
+[ ! -e "$tmp/failed" ]
