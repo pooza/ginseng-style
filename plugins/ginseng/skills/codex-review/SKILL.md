@@ -141,6 +141,13 @@ PR には Codex（`chatgpt-codex-connector[bot]`）のレビューが遅れて�
 
 🔴 **`issues/N/reactions` は PR 番号ごとにしか引けない**ので、下の「PR を列挙して回さない」とそのままでは両立しない。⚠⚠ **禁じているのは「件数で窓を切ること」**であって列挙そのものではない。**`--paginate` で全部並べてから絞る。**
 
+⚠ **この節の例は `jq` が要る。** Windows の Git Bash には入っていない（[#139](https://github.com/pooza/ginseng-style/issues/139)。`bc` も無い）。
+
+- 1 ページで済む問い合わせ（下の `issues/$n/reactions` など）は、`gh api --jq` に置き換えられる
+- 🔴 **ページをまたぐ集計は `gh api --paginate --jq` に置き換えられない。** 式がページごとに評価されるので、`length` を取ると合計ではなく**ページごとの件数が並ぶ**（実測: `50` / `50` / `39`）。例が `jq -s add` で一度まとめているのはこのため
+  - `jq` が無い環境では、`gh api --paginate` の出力を Node などで読んで集計する。⚠⚠ **`gh` を子プロセスとして起動し、終了ステータスが 0 でなければ走査失敗として止める**（下の「パイプで繋がない」と同じ理由）。判定の中身（4 経路・`+1` だけを数える・要約コメントを外す・基点）は jq の例と同じにする
+  - ⚠ `gh api --paginate --slurp`（全ページを 1 つの配列で返す）は新しめの `gh` にしかない。gh 2.46.0 には無い
+
 ```sh
 # ⚠⚠ issue の一覧はリアクションの集計を持っているので、ここで候補を絞れる。
 gh api --paginate "repos/$repo/issues?state=all&per_page=100" >| /tmp/issues-raw.json \
