@@ -183,7 +183,8 @@ steps:
 
 ⚠⚠ **すでにある上書きには印が無いので、各プロジェクトで一度だけ洗い出す。**手順の正本は [audit-overrides スキル](../plugins/ginseng/skills/audit-overrides/SKILL.md)（`/ginseng:audit-overrides`。[skills.md](skills.md)）。
 
-- ⚠ **洗い出しの Issue は、各プロジェクトのセッションが立てる。**当番からは起票しない（[docs/CLAUDE.md](CLAUDE.md) の分界）
+- ⚠ **洗い出しの Issue は当番が各プロジェクトへ起票し、[#149](https://github.com/pooza/ginseng-style/issues/149) で追う。**洗い出しと直しはそのプロジェクトのセッションが行う — ⚠ **当番はアプリ側のコードに触れない**（[docs/CLAUDE.md](CLAUDE.md) の分界。起票は告知と同じ扱い）
+- ⚠ **gem 側も同じ。** gem 同士の上書き（`ginseng-core` のメソッドを他の gem が上書き）は当番が洗い出す
 - ⚠⚠ **`grep '< Ginseng::'` では足りない。**継承しているクラスしか分からず、どのメソッドを上書きしているかも、開き直し・`prepend` も出ない。スキルの `scripts/overrides.rb` は読み込んだ上で 3 つとも拾う
 
 ### ⚠ ピン留めのばらけを放置しない

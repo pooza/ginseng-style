@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 ⚠⚠ **正本はこのファイル。** 規則（上書きを書くその場で返すかを決め、印を残す）は [docs/ginseng.md](https://github.com/pooza/ginseng-style/blob/main/docs/ginseng.md) の「上書きを書くときに、上流へ返すかを決めて印を残す」にある。ここは**規則ができる前に書かれた、印の無い上書き**を一度だけ片付ける手順。
 
-⚠ **各プロジェクトのセッションが、そのプロジェクトで行う。** 当番（ginseng-style）からは起票しない。手本は [pooza/mulukhiya-toot-proxy#4898](https://github.com/pooza/mulukhiya-toot-proxy/issues/4898)。
+⚠ **各プロジェクトのセッションが、そのプロジェクトで行う。** 洗い出しの Issue は当番（ginseng-style）が起票しており、進み具合は [pooza/ginseng-style#149](https://github.com/pooza/ginseng-style/issues/149) で追う — **Issue を閉じたら #149 へ一言返す**。手本は [pooza/mulukhiya-toot-proxy#4898](https://github.com/pooza/mulukhiya-toot-proxy/issues/4898)。
 
 ## 手順
 
@@ -27,6 +27,7 @@ disable-model-invocation: true
 ```sh
 bundle exec ruby -I app/lib <スキルのディレクトリ>/scripts/overrides.rb <入口の .rb> <アプリの名前空間>
 # 例: bundle exec ruby -I app/lib .../overrides.rb app/lib/mulukhiya.rb Mulukhiya > overrides.tsv
+# gem: bundle exec ruby -I lib .../overrides.rb lib/ginseng/fediverse.rb Ginseng::Fediverse
 ```
 
 標準出力に TSV（種類・クラス・メソッド・上書きされた側・定義の場所）、標準エラーに件数と読めなかった定数が出る。
@@ -40,6 +41,7 @@ bundle exec ruby -I app/lib <スキルのディレクトリ>/scripts/overrides.r
 - ⚠⚠ **「読めなかった定数」を必ず見る。** 遅延読み込み（Zeitwerk）の定数を 1 つずつ読んでいて、読めなかったものは**一覧に出てこない**。手元に DB が無いと Sequel のモデルは読めない（モロヘイヤでは 24 個）。⚠ 読めなかった分は「未確認」として Issue に書く
 - ⚠ `eager_load` を使わないのは、**1 つ落ちるとそこで止まる**から（Sequel のモデルで止まった実測がある）
 - ⚠ Zeitwerk を使っていないアプリは、入口の `.rb` で全部 `require` されていれば足りる
+- ⚠ **gem を調べるときは、名前空間に gem 自身（`Ginseng::Fediverse`）を渡す。** その中の継承は上流と見なさない（渡さないと gem の中の継承が全部出る — fediverse では 55 件中 53 件）
 
 ## 振り分け
 
