@@ -37,13 +37,25 @@ inspect_of = Module.instance_method(:inspect)
 named = ->(mod, prefix) {name_of.bind_call(mod)&.start_with?(prefix)}
 ginseng = /\A(#<Class:)?Ginseng::/
 own_methods = ->(k) {k.instance_methods(false) + k.private_instance_methods(false)}
+# prepend されたモジュールに同名のメソッドがあると instance_method はそちらを返すので、k 自身の定義まで降りる。
+own_method = lambda do |k, m|
+  method = k.instance_method(m)
+  method = method.super_method while method && method.owner != k
+  method
+end
+# vendor/bundle などアプリの下に gem を入れていると、gem 本体の定義もアプリの下に見える。
+gem_dirs = Gem.loaded_specs.values.map {|spec| File.join(spec.full_gem_path, '')}
+app_file = lambda do |path|
+  next false unless path&.start_with?(File.join(root, ''))
+  gem_dirs.none? {|d| path.start_with?(d)}
+end
 
 mods = ObjectSpace.each_object(Module).to_a
 rows = []
 mods.select {|c| named.call(c, "#{ns}::")}.each do |c|
   [c, c.singleton_class].each do |k|
     own_methods.call(k).each do |m|
-      method = k.instance_method(m)
+      next unless (method = own_method.call(k, m))
       next unless (sm = method.super_method) && inspect_of.bind_call(sm.owner).match?(ginseng)
       rows << ['override', name_of.bind_call(c), m, inspect_of.bind_call(sm.owner),
         method.source_location&.join(':')]
@@ -56,8 +68,7 @@ mods.select {|c| named.call(c, 'Ginseng::')}.each do |c|
       rows << ['prepend', name_of.bind_call(c), '-', inspect_of.bind_call(p), '-']
     end
     own_methods.call(k).each do |m|
-      method = k.instance_method(m)
-      next unless method.owner == k && method.source_location&.first&.start_with?(root)
+      next unless (method = own_method.call(k, m)) && app_file.call(method.source_location&.first)
       rows << ['reopen', name_of.bind_call(c), m, '-', method.source_location.join(':')]
     end
   end
