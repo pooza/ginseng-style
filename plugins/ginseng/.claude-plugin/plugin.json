@@ -1,7 +1,7 @@
 {
   "name": "ginseng",
   "description": "ginseng-* 共通の手順（Codex のレビューの処理・上書きの洗い出しなど）",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Tatsuya Koishi",
     "email": "tkoishi@b-shock.co.jp"
