@@ -26,7 +26,7 @@
 
 `Gemfile.lock` は git 参照のリビジョンを固定するので、**リポジトリごとに違う版が刺さったまま進む**。`ginseng-core` の HEAD が 2026-08-18 の時点で、刺さっている版は **8 種類**、最古は **2026-04-14（4 ヶ月前）** だった。
 
-⚠ **security 修正が一部にしか届いていない状態になりやすい。** 実例: [pooza/makoto2#101](https://github.com/pooza/makoto2/issues/101)（`Gemfile.lock` が 1.15.28 で止まり、security 修正 6 件を取り込めていなかった）。棚卸しの手順は [workflow.md](workflow.md) の「ピン留めのばらけを放置しない」にある。
+⚠ **security 修正が一部にしか届いていない状態になりやすい。** 実例: [pooza/makoto2#101](https://github.com/pooza/makoto2/issues/101)（`Gemfile.lock` が 1.15.28 で止まり、security 修正 6 件を取り込めていなかった）。棚卸しの手順は [ginseng.md](ginseng.md) の「ピン留めのばらけを放置しない」にある。
 
 ### 🔴 CI が 1 本もテストを走らせていなかった
 

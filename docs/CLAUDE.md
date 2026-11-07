@@ -42,10 +42,10 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 版で固定すると「勝手に赤くなる」は止まるが、代わりに **配り忘れが永久に残る**。⚠ **これは仮定ではない** — `ginseng-core` は最後のタグ `v1.15.26` が **2026-06-10** で、以降 **88 コミット**・`bump version` は 20 回以上あるのにタグがひとつも増えていない。**手で打つ運用は死ぬ。**
 
 - タグは [release.yml](../.github/workflows/release.yml) が打つ（`config/lib.yaml` の `package.version` が正本）。⚠⚠ **手順本体は [release-tag](../.github/actions/release-tag/action.yml) にあり、gem 側 7 本も同じものを `@<SHA>` で呼ぶ**（#65 / #75。⚠ タグは付け替えられるので SHA で固定する）
-  - ⚠⚠ **引き金はリポジトリで違う。** このリポジトリは `mode: auto`（push＝出荷）、**gem 側 7 本は `mode: manual`（`workflow_dispatch` を人が押す）**。着手時バンプをするかどうかで決まる（[workflow.md](workflow.md) の「タグを手で打たない」）
+  - ⚠⚠ **引き金はリポジトリで違う。** このリポジトリは `mode: auto`（push＝出荷）、**gem 側 7 本は `mode: manual`（`workflow_dispatch` を人が押す）**。着手時バンプをするかどうかで決まる（[ginseng.md](ginseng.md) の「タグを手で打たない」）
   - 🔴 **押し忘れは [gem-watch](../.github/workflows/gem-watch.yml) の `releases` ジョブが週次で一覧に出す**（赤にはしない）
 - 古い版で止まっている利用側は、[gem-watch](../.github/workflows/gem-watch.yml) が週次で出す。`ginseng-style` の参照（gem 側 7 本）は `pins`、**アプリ側の `ginseng-*` 参照（#103）は `consumers`**。⚠⚠ **判定の規則が逆なので混ぜない** — lock を持たない gem 側では `tag:` が error、`revision:` を lock に持つアプリ側では `tag:` が正解
-  - 🔴 **`consumers` の対象一覧は `secrets.GEM_WATCH_CONSUMERS`**（private / 他 org の名前をここに書けないため）。⚠⚠ **`vars` にしない — step の `env:` はログに平文で出る**（[workflow.md](workflow.md)）
+  - 🔴 **`consumers` の対象一覧は `secrets.GEM_WATCH_CONSUMERS`**（private / 他 org の名前をここに書けないため）。⚠⚠ **`vars` にしない — step の `env:` はログに平文で出る**（[ginseng.md](ginseng.md) の「週次 schedule は勝手に止まる」）
 - ⚠ **`pins` では未固定（`@main` / `branch: 'main'`）を落とす。古いだけなら落とさない** — 配っている最中は必ず古い期間があり、そこで赤くすると「赤は無視するもの」になる。⚠ **`consumers` の未固定は warning 止まり**（固定しないと決めた利用側がある。#103）
 
 ## ⚠ ginseng-* の利用者
@@ -72,7 +72,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 ⚠ 内訳（どのリポジトリがどの版か）はセッションメモリ側にある。
 
-⚠ **security 修正が一部にしか届いていない状態になりやすい。** 実例: [pooza/makoto2#101](https://github.com/pooza/makoto2/issues/101)（`Gemfile.lock` が 1.15.28 で止まり security 修正 6 件を取り込めていない）。棚卸しのワンライナーは [workflow.md](workflow.md) の「ピン留めのばらけを放置しない」にある。
+⚠ **security 修正が一部にしか届いていない状態になりやすい。** 実例: [pooza/makoto2#101](https://github.com/pooza/makoto2/issues/101)（`Gemfile.lock` が 1.15.28 で止まり security 修正 6 件を取り込めていない）。棚卸しのワンライナーは [ginseng.md](ginseng.md) の「ピン留めのばらけを放置しない」にある。
 
 ## このリポジトリ自身の作り
 

@@ -2,6 +2,8 @@
 
 プロジェクト横断の運用規約。⚠ **リリース手順やデプロイのようにプロジェクト固有のものは、各リポジトリの `docs/CLAUDE.md` に置く。** ここには共通の骨格だけを書く。
 
+⚠⚠ **ここに書くのは言語に依らない運用（#145）。** Ruby・`ginseng-*` に固有のもの（`release-tag` / CI / `ginseng-*` の変更手順 / Ruby のパッチ版）は [ginseng.md](ginseng.md)、Node.js / PHP の lint・整形・静的解析の設定は [gobou](https://github.com/pooza/gobou)（#142）。
+
 ## Issue 駆動
 
 - 課題・タスクは GitHub Issue で管理する。docs に書くだけでは管理されていない扱い。⚠ **利用側から PR だけが届いた場合は、受け取った側が Issue を起こす**（下記「着手順」）
@@ -11,19 +13,19 @@
 
 ## ⚠⚠ 着手順 — ライブラリ側は「依頼」を最優先にする
 
-`ginseng-*` はライブラリなので、**着手順は緊急性・即効性だけでは決まらない。**
+`ginseng-*` と gobou は配る側（ライブラリ・共有設定）なので、**着手順は緊急性・即効性だけでは決まらない。**
 
 1. ⚠⚠ **利用側プロジェクトからの依頼が最優先。** 相手側の緊急性に配慮する。⚠ **こちらの都合で後回しにしない**
 2. **ginseng 自身の品質向上（リファクタ・CI・テスト・規約）は、依頼の合間に進める**
 3. 依頼が無い期間に品質向上を進め、依頼が来たら**そちらへ寄せる**
 
-⚠ **依頼は `request` ラベルで識別する。** 起票・受け取りの時点で付ける。ラベル集合は `ginseng-*` 全リポジトリで揃えてある。⚠ **既存の Issue へのコメントで来た依頼など、ラベルの付いていないものもある。** 棚卸しの手順と順位の付け方の正本は [sync スキル](../.claude/skills/sync/SKILL.md)。
+⚠ **依頼は `request` ラベルで識別する。** 起票・受け取りの時点で付ける。ラベル集合は `ginseng-*` 全リポジトリと gobou で揃えてある。⚠ **既存の Issue へのコメントで来た依頼など、ラベルの付いていないものもある。** 棚卸しの手順と順位の付け方の正本は [sync スキル](../.claude/skills/sync/SKILL.md)。
 
 ### ⚠ 依頼は Issue より PR で受けたい
 
 **PR で来たほうが進行が早い。** 利用側は再現の文脈を持っているので、そこで書いたほうが往復が減る。
 
-- ⚠ **アプリ側が gem の修正を自分のリポジトリで回避しない**（下記「`ginseng-*` の変更手順」）という分界は変わらない。**避けるのは回避策で、PR を出すことは歓迎する**
+- ⚠ **アプリ側が gem の修正を自分のリポジトリで回避しない**（[ginseng.md](ginseng.md) の「`ginseng-*` の変更手順」）という分界は変わらない。**避けるのは回避策で、PR を出すことは歓迎する**
 - ⚠⚠ **PR だけで送ってよい。Issue 駆動は崩さないが、依頼元に二度手間をさせない** — **PR で来たら、受け取った gem 側が Issue を起こして紐づける**。サイズ・マイルストーン・重み予算は Issue に載るので、**管理の単位は Issue のまま**
 - PR を出せない場合は Issue で。⚠ **再現手順と、どのアプリのどの経路で踏んだか**を書く
 - ⚠ gem 側が実装まで引き受けるかは、**依頼元が実装の主体を持てるかで決める**。持てるなら PR を待ち、こちらはレビューと配布に回る
@@ -33,7 +35,7 @@
 
 ⚠ **gem 側とアプリ側で違う。** 2026-08-22 の実測に合わせている。
 
-- **gem 側（`ginseng-*`）は `main` だけ持つ。** feature ブランチを切って `main` へ直接 PR を出す。⚠ **`develop` は作らない**
+- **配る側（`ginseng-*` / gobou）は `main` だけ持つ。** feature ブランチを切って `main` へ直接 PR を出す。⚠ **`develop` は作らない**
 - **アプリ側は `main`（リリース）と `develop`（開発）を持つ**
 - 作業は feature ブランチを切る。命名は `fix/<issue>-<slug>` / `feat/<issue>-<slug>` / `docs/<issue>-<slug>`
 - ⚠ `gh pr create` は `--base` を必ず明示する。省略すると default branch が宛先になり、**フォークでは upstream に向く**
@@ -101,7 +103,7 @@ gem 側の `request` は「**利用側プロジェクトからの依頼**」で�
 | --- | --- |
 | セキュリティ | 認証・トークンの取り扱い・シークレットの scrub・入力検証・**依存の床**（下記「依存の制約に『なぜ』を書く」） |
 | エラー処理・観測性 | 例外の分類、ログの個人情報漏洩、ヘルスチェックの判定 |
-| コーディングスタイル・規約整合性 | RuboCop、本ドキュメントの規約、廃止語 |
+| コーディングスタイル・規約整合性 | lint（Ruby は RuboCop、Node.js / PHP は gobou の設定）、本ドキュメントの規約、廃止語 |
 
 指摘は次の基準で分類し、**必要最小限のみ本リリースで対応**、残りは次リリース以降へ送る。⚠ 送り方は下記「送りは版ではなく話題で束ねる」。
 
@@ -152,24 +154,7 @@ gem 側の `request` は「**利用側プロジェクトからの依頼**」で�
 
 ### ⚠⚠ タグを手で打たない — 引き金はリポジトリで違う
 
-🔴 **手で打つ運用は死ぬ。** ⚠ これは仮定ではない — 2026-08-27 の実測で、**4 gem に計 8 版ぶんの出荷が滞留**していた（`ginseng-core` は version 1.22.0 に対しタグが `v1.20.0` で **security 修正 2 件が未出荷**、`ginseng-web` は 3 版、`ginseng-redis` は 2 版、`ginseng-piefed` はタグが 1 本も無し）。
-
-手順本体は [.github/actions/release-tag](../.github/actions/release-tag/action.yml)（composite action）に置き、各リポジトリの `.github/workflows/release.yml` から呼ぶ（[CI](#ci) の `ruby-check` と同じ形）。**タグの正本は `config/lib.yaml` の `package.version`**（8 本すべてこの形。gemspec の `spec.version` もここを読む）。
-
-⚠⚠ **引き金は 2 通りある。揃えようとしないこと。** 着手時バンプをするかどうかで決まる。
-
-| | `mode` | タグを打つ引き金 | 着手時バンプ |
-| --- | --- | --- | --- |
-| `ginseng-style` | `auto` | **`main` への push**（バンプ＝リリース） | しない |
-| gem 側 7 本 | `manual` | 🔴 **`workflow_dispatch`**（人が押す） | する |
-
-- ⚠⚠ **gem 側で push を引き金にしてはいけない。** 着手時バンプをする以上、`main` には「まだタグの無い version」が載っているのが正常で、そこで打つと**マイルストーンの 1 本目の PR が載った時点で出荷される**（＝ 上の `v1.8.29` の事故と同じ形）
-- **押すのは「Issue を消化 → リリース前レビュー」の後。** ⚠ `gh workflow run release.yml -R pooza/<gem>` でよい
-- ⚠ **どちらの mode でも、push のたびに「配布物を変えたのに `v<version>` のまま」を検査する。** 引っ掛かったら version を上げる（＝着手時バンプのし忘れ）
-  - ⚠⚠ **比較の基点はタグそのもの**であって、その push の前ではない。`github.event.before` を基点にすると **1 push 分しか見ない**ので、配布物を変えた push と version を上げないまま重ねた push が分かれていると素通りする
-  - ⚠⚠ **「配布物」は 2 系統ある。片方だけ見ると漏れる。** gem として配るもの（`ginseng-core` なら `bin/` `cert/` `config/` `images/` `lib/` `views/`）と、**タグ経由で参照されるもの**（`.github/actions/*`）
-  - ⚠⚠ **だから `paths` に既定は置いていない。** リポジトリごとに中身が違うので、それらしい既定は**静かに取りこぼす**（＝この検査が一番効いてほしい場面で黙る）。列挙は [README](../README.md) の「`paths` に既定は無い」の表
-- 🔴 **押し忘れは自動では直らない。** [gem-watch](../.github/workflows/gem-watch.yml) の `releases` ジョブが、version と最新タグのずれを**週次で一覧に出す**。⚠ 赤にはしない（着手時バンプをする以上ずれる期間は必ずあり、そこで赤くすると「赤は無視するもの」になる）
+→ [ginseng.md](ginseng.md) の「タグを手で打たない — 引き金はリポジトリで違う」に移した（`ginseng-*` と Ruby に固有のため。#145）。
 
 ### ⚠⚠ どの桁を上げるか — 「名前が消えるか」だけで決めない
 
@@ -244,6 +229,7 @@ spec.add_dependency 'sinatra', '>=4.1.0', '<4.2.0'
 - gem 側 7 本は `Gemfile.lock` を追跡していないので、**CI のチェックアウトに lock が無く、毎回 rubocop の最新を引く**。⚠⚠ `NewCops: enable` と組み合わさると、**こちらが 1 行もコミットしていないのに 8 本の CI が同時に赤くなりうる**
 - ⚠ 実測（2026-08-31）: 過去 12 か月に入った新 cop 27 個は**全部 `pending`**（＝ `NewCops: enable` が自動で有効にする）。⚠⚠ **新 cop が入るのは minor だけ**なので、`~> x.y.0` は cop の顔ぶれを凍らせたままパッチの修正だけ受け取る
 - **動かしてよい条件は「外す」ではなく「上げる」。** 8 リポジトリで `bundle exec rubocop` を通し、新しい offense を潰してから配る（[docs/CLAUDE.md](CLAUDE.md) の「設定を変えるときの手順」）
+- ⚠ **gobou も同じ判断で、道具の版を決め打ちで固定している**（Biome `2.6.6`、PHP-CS-Fixer / PHPStan / phpcs も `^` を付けない）。利用側にも同じ版で固定させる。版を上げたときに規則が黙って外れないよう、gobou は検体のテストで照らし合わせる（#142）
 - 🔴 **固定は「いつまでも古いまま」を招く**（`pins` と同じ構造）。追随の合図は週次の [gem-watch](../.github/workflows/gem-watch.yml) の `linters` ジョブが一覧に出す。⚠ **赤にはしない** — 上げていない期間があるのは正常。⚠⚠ **上限が無くなっていたら落とす**（🔴 見るのは「制約が在るか」ではなく「**上限が在るか**」— `>= 1.90.0` へ緩めると見張り自身が緑のまま穴が戻る）。そこは「古い」ではなく「壊れた」
 
 ### 🔴 advisory だけで床を決めない
@@ -253,7 +239,7 @@ spec.add_dependency 'sinatra', '>=4.1.0', '<4.2.0'
 - 🔴 **床を提案する前に postmortem を読む。** advisory を引くのは必要だが十分ではない
 - ⚠⚠ **advisory は系列ごとに修正版が分かれる。** 低い系列の修正版を下限にすると**高い系列の未修正版が入る**（`rack >=3.1.21` は 3.2.0〜3.2.5 を、`puma >=7.2.1` は 8.0.0 / 8.0.1 を許す）
 - ⚠ **コメントに書かれた CVE 番号を信用しない。** advisory と突き合わせる（`ginseng-web v1.4.4` は rack の脆弱性を `rack-session` の行に書いていた）
-- 引き方は `gh api "/advisories?ecosystem=rubygems&affects=<gem>&per_page=100"`。CVE 単体は `?cve_id=<CVE>`
+- 引き方は `gh api "/advisories?ecosystem=rubygems&affects=<gem>&per_page=100"`（Node.js は `ecosystem=npm`、PHP は `ecosystem=composer`）。CVE 単体は `?cve_id=<CVE>`
 
 ### ⚠ 「利用側の事情を汲め」という規約ではない
 
@@ -261,166 +247,21 @@ spec.add_dependency 'sinatra', '>=4.1.0', '<4.2.0'
 
 ## ⚠ lint とテストを迂回しない
 
-「環境が壊れている」を理由に lint / test を飛ばさない。`bundle install` 等で環境を作ってから必ず実行する。簡単な環境構築は確認を取らずに進めてよい。
+「環境が壊れている」を理由に lint / test を飛ばさない。`bundle install` / `npm ci` / `composer install` 等で環境を作ってから必ず実行する。簡単な環境構築は確認を取らずに進めてよい。
 
 ⚠⚠ **CI も同じ。** 2026-08-19 まで `ginseng-*` 全 7 gem の CI は `rake test` を呼んでおらず、**計 366 件のテストが一度も走っていなかった**。ワークフロー名が `test` でも中身が lint だけなら、緑は「lint が通った」以上の意味を持たない（経緯は [rationale.md](rationale.md)）。
 
 ## CI
 
-`ginseng-*` の CI は、手順本体を [.github/actions/ruby-check](../.github/actions/ruby-check/action.yml)（composite action）に置き、各 gem の `.github/workflows/test.yml` から呼ぶ。
-
-```yaml
-on:
-  push:
-  schedule:
-    - cron: '25 0 * * 1'
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-steps:
-  - uses: actions/checkout@v5
-    with:
-      persist-credentials: false
-  # ⚠⚠ @main でもタグでもなく SHA で固定する。理由は下の「参照は必ず SHA で固定する」。
-  - uses: pooza/ginseng-style/.github/actions/ruby-check@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7
-```
-
-⚠ **`matrix` / `services` / `schedule` は呼び出し側に残す。** Ruby の対応版・必要なミドルウェアは gem ごとに違う。共通化するのは手順だけ。
-
-### ⚠⚠ 参照は必ず SHA で固定する
-
-`ginseng-style` は利用側から **3 経路**で参照される。⚠⚠ **どれも `@main` / `branch: 'main'` にしないこと。**
-
-| 経路 | 何が入ってくるか | 書き方 |
-| --- | --- | --- |
-| `.github/workflows/test.yml` | CI の手順本体（composite action） | `...actions/ruby-check@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7` |
-| `.github/workflows/release.yml` | タグを打つ手順（composite action。#65） | `...actions/release-tag@7196764dca7628c3fd1226bcc08415f8bda2fd31 # v1.1.7` |
-| `Gemfile` | RuboCop の設定と rubocop 本体・プラグイン | `ref: '7196764dca7628c3fd1226bcc08415f8bda2fd31' # v1.1.7` |
-
-🔴 **タグではなく SHA（#75）。** タグは付け替えられるので、`vX.Y.Z` は固定になっていない。⚠⚠ **`release-tag` は利用側の `contents: write` トークンを受け取る**ので、`ginseng-style` を取られた側が利用側の ref を作り替えられる。
-
-- **末尾に `# vX.Y.Z` をコメントで添える。** ⚠ 人間が読むためのもので、**検査には使わない**
-- ⚠⚠ **`gem-watch` の `pins` は SHA からタグを引いて突き合わせる。** コメントを信用すると、⚠ **規約に頼る ＝ ずれても気づけない**
-- 🔴 **タグの無い SHA を刺していたら赤。** レビューを通っていないコミットを刺しているということ
-- 🔴 **`vX.Y.Z`（タグ）での参照は赤。** 2026-08-27 に 8/8 が SHA へ移り終えた（#75）。⚠ 移行の最中だけ warning に留めていた
-
-**固定しないと、利用側が 1 行もコミットしていないのに次の push で CI が赤くなる。** `config/rubocop.yml` に cop を足した瞬間、`NewCops: enable` があるので rubocop 本体の更新でも同じことが起きる。⚠ 「1 リポジトリで試してから配る」という下記の手順は、**配る前に全リポジトリへ届いてしまう**ので前提から崩れていた。
-
-⚠⚠ **`Gemfile.lock` は固定の代わりにならない。** gem 側は `Gemfile.lock` を `.gitignore` していて、**CI のチェックアウトには lock がそもそも存在しない**。`bundle install` は毎回 `main` の HEAD を解決する。実測（2026-08-23、`ginseng-style` の main = `956e0a68e7`）:
-
-| | 刺さっていた版 | main から |
-| --- | --- | --- |
-| gem 側 7 本の**手元** | `9422f76dba` ほか（2026-08-19） | 45〜48 遅れ |
-| gem 側 7 本の **CI** | `main` | 0 |
-
-🔴 **手元と CI が 48 コミット違う状態で「緑」と言っていた。** 実害の例: `ginseng-core` の手元だけ `Minitest/AssertPathExists` が出て、CI は同じコミットで緑だった（[#53](https://github.com/pooza/ginseng-style/issues/53)）。
-
-### ⚠⚠ 呼び出し側で権限を絞る
-
-手順本体は他リポジトリの composite action なので、**`ginseng-style` に入った変更が、各リポジトリの `GITHUB_TOKEN` を持って動く。** 止まるだけでなく任意のコードが走る側面がある。⚠⚠ **版で固定してもこの性質は消えない**（固定は「いつ変わるか」を選べるようにするだけで、「何が動くか」は変わらない）。権限を絞るのは固定とは別に必ずやる。
-
-- **`permissions: contents: read` を workflow に必ず置く。** ⚠ リポジトリ既定に頼らない
-- **`actions/checkout` に `persist-credentials: false` を置く。** ⚠ 既定では認証情報がワークツリーの `git config` に残り、後続のステップから使える。依存 gem は public な `github:` 参照なので、消しても `bundle install` に影響しない
-- ⚠⚠ **リポジトリ設定側の既定も `read` に落とす。** Settings → Actions → General → Workflow permissions。ファイルの `permissions:` は**その workflow にしか効かない**ので、両方要る
-
-⚠ 2026-08-22 実測で、**8 リポジトリ中 6 つが既定 `write`**（`can_approve_pull_request_reviews` も `true`）で、**7 gem のどれにも `permissions:` と `persist-credentials:` が無かった**。
-
-### ⚠⚠ 週次 schedule は勝手に止まる
-
-> In a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days.
-> — [GitHub Docs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
-
-⚠⚠ **`schedule:` の実行そのものは活動に数えられない。** 更新が止まった gem ほど止まりやすく、**いちばん必要な場面で監視が消える。**
-
-⚠ **「repository activity」の定義は文書化されていない。** したがって空コミット等の keepalive で延命する案は採らない。**定義が変われば黙って壊れる。**
-
-代わりに、[gem-watch](../.github/workflows/gem-watch.yml) で 2 つに分けて解く。
-
-1. **無効化の検知** — 各リポジトリの `GET /repos/{owner}/{repo}/actions/workflows` を見て、`state` が `active` でなければ job を落とす。⚠ `disabled_inactivity` は API の定義済みの値なので、「活動」の定義に依存しない
-2. **実行の担保** — 各 gem の `schedule:` に頼らず、`workflow_dispatch` で毎週起こす
-
-⚠⚠ **`gem-watch` 自身が 60 日で止まる可能性は残る。** `ginseng-style` は管理拠点で活動が続く前提に乗っている。**完全に塞ぐには外部の cron から `gem-watch` の最終実行を見るしかない**ので、そこはリスクとして受け入れている。
-
-⚠ 動かすには `GEM_WATCH_DISPATCH_TOKEN`（fine-grained PAT・`pooza` 名義・対象 8 リポジトリ・Actions: Read and write / Contents: Read）を `ginseng-style` の secret に置く。`GITHUB_TOKEN` は他リポジトリを起動できない。
-
-`consumers` ジョブ（アプリ側の `ginseng-*` 参照。#103）は、さらに次の 2 つを secret に置く。
-
-| secret | 中身 |
-| --- | --- |
-| `GEM_WATCH_CONSUMERS` | 見張る利用側の `owner/repo` を空白区切りで。⚠⚠ **全リストはセッションメモリ側が正本** |
-| `GEM_WATCH_READ_TOKEN` | `GEM_WATCH_DISPATCH_TOKEN` で読めない利用側を読むトークン（**Contents: Read のみ**）。⚠ fine-grained PAT は resource owner を 1 つしか持てないので、**他 org の private はこちら**。無ければ省略してよい（読めない利用側は error になる） |
-
-- ⚠⚠ **トークンの名前は org ではなく「任せている仕事」で付ける。** 🔴 **`dispatch` のほうにだけ `Actions: Read and write` が要るのは、各 gem の `test.yml` を起こすから** — `read` のほうは `Gemfile` を読むだけで何も起動しない。⚠ **org の差ではなく仕事の差**なので、揃えると**使わない書き込み権限を public リポジトリの secret に置く**ことになる
-  - 🔴 **名前を揃えなかった理由を書かないと「片方が設定を間違えている」と読まれる**（2026-09-13 に実際そう読まれた）
-
-- 🔴🔴 **一覧は `vars` ではなく `secrets` に置く。** private と他 org の名前はこの public なリポジトリに書けないが、⚠⚠ **step の `env:` はログにそのまま出る** — `vars` は平文、`secrets` だけが `***` になる（2026-09-07 の実行ログで確認）
-- 🔴 **ログとサマリにも名前を出さない。** 実名で出すのは **`pooza` の public リポジトリだけ**で、それ以外は `GEM_WATCH_CONSUMERS` の順番（伏せ字 #N）で示す。⚠ **`private` だけで判定しないこと** — 他 org にも public のリポジトリがあり、実名が出た（2026-09-11）
-- ⚠ **見るブランチは「既定より進んでいる `develop`」、無ければ既定。** 「`develop` があればそちら」は誤り（置き去りの `develop` がある）
-- ⚠ **未固定は warning で、error にしない**（#103）。`tomato-shrieker` / `loquat` / `shooby-do-bop` / `dqdai-anniv` は固定しないと決めた（2026-09-17）ので、warning からも外して一覧に `➖ 固定しない` と出す。追随は `tomato-shrieker` の同期手順のピン棚卸しで見る
-
-- **週次の `schedule:` を必ず置く。** ⚠ push 契機だけだと、更新が止まった gem は永遠に緑のまま赤に気づけない。実例: `ginseng-postgres` の CI は 4 ヶ月赤のまま誰も気づかなかった
-- ⚠ **`schedule:` はデフォルトブランチでしか動かない。** feature ブランチに置いても発火しない
-- **`workflow_dispatch:` も必ず置く。** ⚠ 下記のとおり `schedule:` は勝手に止まるので、外から起こせる口が要る
-- ⚠ ginseng-style を壊すと全 gem の CI が同時に止まる。この gem の CI が緑であることを先に確認してから配る
+→ [ginseng.md](ginseng.md) の「CI」に移した（`ginseng-*` と Ruby に固有のため。#145）。Node.js / PHP の CI は [gobou](https://github.com/pooza/gobou) の README。
 
 ## ginseng-* の変更手順
 
-⚠ **`ginseng-*` は複数のプロジェクトが同時に使う。** アプリ側の都合で gem を直すと、他の利用者に黙って影響が出る。
-
-1. アプリ側で「gem を直せば済む」と分かったら、**該当 gem のリポジトリへ、次のどちらか一方**を出す。⚠ **両方は要らない**
-    - **直せるなら PR**（⚠ こちらが望ましい。**受け取った gem 側が Issue を起こして紐づける**。上記「着手順」参照）
-    - **直せないなら Issue**（再現手順と、どのアプリのどの経路で踏んだかを書く）
-
-    ⚠ いずれにせよ**アプリ側リポジトリで回避策を持たない**
-2. gem を直したら、**利用しているリポジトリを横断で確認する**。誰が使っているかは `Gemfile` / `*.gemspec` の `ginseng` 参照で分かる
-3. アプリ側は `bundle update <gem>` で取り込み、`Gemfile.lock` の更新をコミットする。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**
-4. ⚠ **アプリ側の修正だけで直ったと判断しない。** gem が値を捨てていて届かないことがある。`gem 修正` → `bundle update` → `アプリ側 PR` を同じサイクルで回す
-5. ⚠⚠ **逆も同じ。gem を直しただけで「届いた」と判断しない。** 下記
-
-### ⚠⚠ 利用側が同じ場所を上書き・回避していると、gem を直しても届かない
-
-**修正した当のメソッドを利用側が上書きしていれば、修正は 1 行も効かない。** ⚠ これは想像ではなく、**1 回のリリースで 2 件**見つかった実例（`ginseng-fediverse` 1.8.30）。
-
-| 形 | 実例 |
-| --- | --- |
-| **入口ごと上書きしている** | `TagContainer.self.scan` に入れた検査を、利用側が同名のクラスメソッドを上書きして丸ごと迂回していた（[pooza/mulukhiya-toot-proxy#4642](https://github.com/pooza/mulukhiya-toot-proxy/issues/4642)）。⚠ **タグ抽出の主経路がそれ** |
-| **手前で回避策を掛けている** | gem に渡す前に `force_encoding(UTF_8).scrub` していたので、gem 側の検査に**壊れていない値しか届かない**（[pooza/makoto2#171](https://github.com/pooza/makoto2/issues/171)）。⚠⚠ **その回避策自体が、gem 側で「採らない」と決めた形だった** |
-
-⚠ **どちらも「利用側が悪い」話ではない。** 上書きも回避策も、**当時の gem の作りがそれを強いていた**（前者は基底が `TagContainer.new` と決め打ちしていたので、サブクラスは上書きするしかなかった）。**直した側が、それが不要になったことを伝える。**
-
-**How to apply:**
-
-1. 直したメソッド名で**利用側を横断 grep する**。`def <名前>` と、それを呼ぶ手前の加工の両方を見る
-2. 上書き・回避策が見つかったら、⚠ **「もう要らない」ことまで書いて起票する**。⚠⚠ **消し方まで書かないと残り続ける**
-3. ⚠ **こちらではマージしない**（[docs/CLAUDE.md](CLAUDE.md) の分界）
-
-### ⚠ ピン留めのばらけを放置しない
-
-`Gemfile.lock` は git 参照のリビジョンを固定するので、**リポジトリごとに違う版が刺さったまま何ヶ月も進む**。security 修正が一部にしか届いていない状態になりやすい。定期的に横断で棚卸しする。
-
-⚠ **`ginseng-style` は別扱い**（上記「参照は必ず版で固定する」）。刺さっている版は `Gemfile` の `tag:` に書いてあり、古いものは週次の [gem-watch](../.github/workflows/gem-watch.yml) が出す。⚠⚠ **`ginseng-core` などライブラリ本体は #103 でアプリ側から `tag:` 固定へ移している途中**で、固定したものは `gem-watch` の `consumers` ジョブが週次で出す。🔴 **利用側の dependabot は 9 本中 7 本が `lockfile-only` で、`Gemfile` の `tag:` を書き換えない**（2026-09-11 実測）ので、⚠⚠ **固定した版の古さに気づく口は `consumers` だけ**。移り終わるまでは下の棚卸しも要る。
-
-```sh
-for d in ~/repos/*/; do
-  printf '%-24s ' "$(basename "$d")"
-  awk '/remote: https:\/\/github.com\/pooza\/ginseng-core/{f=1} f&&/revision:/{print substr($2,1,10); exit}' \
-    "$d/Gemfile.lock" 2>/dev/null || echo -
-done
-```
+→ [ginseng.md](ginseng.md) の「ginseng-* の変更手順」に移した（`ginseng-*` と Ruby に固有のため。#145）。⚠ 利用側が gem の修正を自分のリポジトリで回避しない、という分界もそちら。
 
 ## Ruby のパッチ版に追従する
 
-**急がないが、放置もしない。** 起点は `ginseng-style` の追跡 Issue（`rollout` ラベル。4.0.7 は #114、4.0.9 は #131）。
-
-- ⚠⚠ **リリース告知ではなく default gem の版差を見る。** 4.0.7 は告知に CVE が無かったが、同梱の resolv が CVE を直していた（#114）
-- 🔴 **順番は「サーバー → アプリ側の `.ruby-version`」。** 逆にすると起動しない。サーバー側が終わったら追跡 Issue にコメントがあり、それを合図に PR を配る
-- 🔴 **`.ruby-version` を上げる PR で、`Gemfile.lock` の `BUNDLED WITH` もその Ruby に同梱の bundler へそろえる** (#131)。同梱の版は `RBENV_VERSION=<版> gem list bundler` の `default:` の先頭で確かめ、`bundle update --bundler=<その版>` で書き換える
-  - ⚠ **そろえないと、サーバーの `bundle install` の前に `gem install bundler -v <lock の版>` が要る。** 実例: mulukhiya-toot-proxy 5.43.0 は lock が 4.0.18 のまま 4.0.9（同梱は 4.0.20）へ上げ、ステージング・本番 8 台すべてで手で入れた
-  - ⚠ **`BUNDLED WITH` は手元の bundler の版が書き込まれるだけで、Ruby の更新とは連動しない。** 2026-10-28 の実測で公開アプリ 7 本は 4.0.10 / 4.0.17 / 4.0.20 の 3 種類に分かれていた
-  - ⚠ **Ruby を上げない回は `BUNDLED WITH` を動かさない**（動いていたら差分で気づく）
-- ⚠ **`ginseng-style` の配布物（`TargetRubyVersion` / `required_ruby_version`）はパッチ版では動かない。** バンプしない。gem 側の CI は `4.0` の浮動指定なので作業は要らない
+→ [ginseng.md](ginseng.md) の「Ruby のパッチ版に追従する」に移した（`ginseng-*` と Ruby に固有のため。#145）。
 
 ## Codex のレビュー
 
