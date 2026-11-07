@@ -10,7 +10,7 @@
     {
       "name": "ginseng",
       "source": "./plugins/ginseng",
-      "description": "ginseng-* 共通の手順（Codex のレビューの処理など）",
+      "description": "ginseng-* 共通の手順（Codex のレビューの処理・上書きの洗い出しなど）",
       "homepage": "https://github.com/pooza/ginseng-style/blob/main/docs/skills.md",
       "repository": "https://github.com/pooza/ginseng-style",
       "license": "MIT"
