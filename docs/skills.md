@@ -84,6 +84,7 @@
 | スキル | 起動 | 中身 |
 | --- | --- | --- |
 | [codex-review](../plugins/ginseng/skills/codex-review/SKILL.md) | 明示のみ | Codex（自動レビュー）の指摘の採否・返信と 👍 / 👎・取り残しの走査。⚠ 正本はこちら（[workflow.md](workflow.md) はポインタ） |
+| [audit-overrides](../plugins/ginseng/skills/audit-overrides/SKILL.md) | 明示のみ | `ginseng-*` のメソッドの上書き（継承・開き直し・`prepend`）を抜き出し、写しを消す／gem へ出す／返すか決めて印を付ける。各プロジェクトで一度だけ。⚠ 規則は [ginseng.md](ginseng.md) の「上書きを書くときに」 |
 
 ## ⚠ 同期は共通化しない
 

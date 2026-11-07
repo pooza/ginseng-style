@@ -173,35 +173,18 @@ steps:
 **How to apply:**
 
 1. ⚠⚠ **gem のメソッドを上書きするときは、その場で「一般化できるか」を決める。**後で棚卸しすると、上書きの理由を思い出すところからやり直しになる（⚠ 既にある分だけは下の手順で一度洗い出す）
-2. **決めた結果を、上書きしたメソッドのコメントに残す。**どちらに決めたかが grep で拾えるようにする
-    - **返す**: gem へたたき台の PR を出し、コメントに `pooza/ginseng-X#n` を書く。着地して `bundle update` したら、⚠ **利用側の写しを消すところまでが手順**（上の「消し方まで書かないと残り続ける」と同じ）
-    - **返さない**: 理由を書く。⚠ **「相手の事情であって一般には成り立たない」と書ければ十分**。手本は `mulukhiya-toot-proxy` の `DictionaryHTTP#retryable?`（404 を再送するのは GAS の事情なので上流を変えにいかない）
+2. **決めた結果を、上書きしたメソッドのコメントに `# ginseng-upstream:` で残す。**⚠⚠ **書式を揃えないと grep で拾えない**ので、次の 3 通りのどれかにする
+    - `# ginseng-upstream: pooza/ginseng-X#n` — **返す**。gem へたたき台の PR か Issue を出し、その番号を書く。着地して `bundle update` したら、⚠ **利用側の写しを消すところまでが手順**（上の「消し方まで書かないと残り続ける」と同じ）
+    - `# ginseng-upstream: no — <理由>` — **返さない**。⚠ **「相手の事情であって一般には成り立たない」と書ければ十分**。手本は `mulukhiya-toot-proxy` の `DictionaryHTTP#retryable?`（404 を再送するのは GAS の事情なので上流を変えにいかない）
+    - `# ginseng-upstream: hold — <見直す条件>` — **保留**。下の 5
 3. ⚠ **「gem の作りのせいで写すしかない」と気づいたら、それは拡張ではなく gem の不具合として扱う。**上の「ginseng-* の変更手順」の 1 に戻る
 4. ⚠ **差し替え口の実装には印は要らない。**gem が上書きされる前提で用意した面（`prefix` を返すだけ、など）は、上書きすること自体が正しい使い方
-5. ⚠ **「いま他の利用者がいない」は返さない理由にならないが、急ぐ理由にもならない。**返すか決めかねるものは「返さない（理由: 利用者が 1 つだけ）」と書いておき、2 つ目の利用者が現れたときに見直す
+5. ⚠ **「いま他の利用者がいない」は返さない理由にならないが、急ぐ理由にもならない。**決めかねるものは `no` ではなく `hold` にして、見直す条件（例: 「2 つ目の利用者が現れたら」）を書く。⚠ **`no` は「一般には成り立たない」と言えるときだけ** — 利用者の数は理由にしない
 
-#### ⚠⚠ すでにある上書きは、各プロジェクトで一度だけ洗い出す
+⚠⚠ **すでにある上書きには印が無いので、各プロジェクトで一度だけ洗い出す。**手順の正本は [audit-overrides スキル](../plugins/ginseng/skills/audit-overrides/SKILL.md)（`/ginseng:audit-overrides`。[skills.md](skills.md)）。
 
-上の規則は**これから書く上書き**に効く。⚠ **すでにある上書きには印が無いので、各プロジェクトで一度だけ洗い出して印を付ける。**`ginseng-*` を使っているプロジェクトごとに Issue を 1 本立てて着手する（手本: [pooza/mulukhiya-toot-proxy#4898](https://github.com/pooza/mulukhiya-toot-proxy/issues/4898)）。
-
-1. **アプリを読み込み、gem のメソッドを上書きしている箇所を機械的に抜き出す。**⚠ `grep '< Ginseng::'` だけでは**継承しているクラス**しか分からず、**どのメソッドを上書きしているか**が出ない。読み込んだ上で、`instance_method(m).super_method&.owner` が `Ginseng::` の下にあるものを拾う
-
-    ```ruby
-    ObjectSpace.each_object(Class).select {|c| c.name&.start_with?('<アプリの名前空間>::')}.each do |c|
-      [c, c.singleton_class].each do |k|
-        (k.instance_methods(false) + k.private_instance_methods(false)).each do |m|
-          next unless (sm = k.instance_method(m).super_method) && sm.owner.inspect.include?('Ginseng')
-          puts [c.name, m, sm.owner.inspect, k.instance_method(m).source_location&.join(':')].join("\t")
-        end
-      end
-    end
-    ```
-
-    ⚠ Zeitwerk などで遅延読み込みしているなら、先に全部読み込む（`eager_load`）。読まれていないクラスは出てこない
-2. **差し替え口の実装を除く。**`prefix` / `dir` / `command` / `default_service` のように、gem が上書きされる前提で用意した面を返すだけのものは印が要らない（上の 4）。⚠ モロヘイヤでは約 120 か所のうち大半がこれだった
-3. **残りを上の表の 3 つの形と「アプリ固有」に振り分け、上の 2 のとおり印を付ける。**写しは消し、gem の不具合は gem へ、拡張は返すか決める
-4. ⚠ **一覧を Issue に貼っておく。**全部を一度に読めなくても、どこまで読んだかが残る
-
+- ⚠ **洗い出しの Issue は、各プロジェクトのセッションが立てる。**当番からは起票しない（[docs/CLAUDE.md](CLAUDE.md) の分界）
+- ⚠⚠ **`grep '< Ginseng::'` では足りない。**継承しているクラスしか分からず、どのメソッドを上書きしているかも、開き直し・`prepend` も出ない。スキルの `scripts/overrides.rb` は読み込んだ上で 3 つとも拾う
 
 ### ⚠ ピン留めのばらけを放置しない
 
