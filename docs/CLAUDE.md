@@ -47,6 +47,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 - 古い版で止まっている利用側は、[gem-watch](../.github/workflows/gem-watch.yml) が週次で出す。`ginseng-style` の参照（gem 側 7 本）は `pins`、**アプリ側の `ginseng-*` 参照（#103）は `consumers`**。⚠⚠ **判定の規則が逆なので混ぜない** — lock を持たない gem 側では `tag:` が error、`revision:` を lock に持つアプリ側では `tag:` が正解
   - 🔴 **`consumers` の対象一覧は `secrets.GEM_WATCH_CONSUMERS`**（private / 他 org の名前をここに書けないため）。⚠⚠ **`vars` にしない — step の `env:` はログに平文で出る**（[ginseng.md](ginseng.md) の「週次 schedule は勝手に止まる」）
 - ⚠ **`pins` では未固定（`@main` / `branch: 'main'`）を落とす。古いだけなら落とさない** — 配っている最中は必ず古い期間があり、そこで赤くすると「赤は無視するもの」になる。⚠ **`consumers` の未固定は warning 止まり**（固定しないと決めた利用側がある。#103）
+- 🔴 **gem 側の gemspec が名前で要求する `ginseng-*`（いまは `ginseng-core`）は、利用側も gem 側も `Gemfile` で git から宣言する (#151)。** 宣言が無いと Bundler は rubygems.org から解決しに行き、⚠⚠ **名前は rubygems.org で空いている**（2026-11-08 実測）ので、誰かが取ると黙って通る。名前は確保せず、`consumers`（間接の依存が未宣言）と `pins`（④）が error で見張る
 
 ## ⚠ ginseng-* の利用者
 

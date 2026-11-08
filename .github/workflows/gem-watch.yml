@@ -216,6 +216,32 @@ jobs:
                       | sed -n 's|.*pooza/ginseng-style/.github/actions/release-tag@\([0-9a-zA-Z._-]*\).*|\1|p' | head -1)
               check_ref "pooza/$r の release.yml の release-tag" "$ref" || bad=1
             fi
+
+            # ④ gemspec が名前で要求する `ginseng-*` を、Gemfile で git から取っているか（#151）。
+            # ⚠⚠ 宣言が無いと、Bundler は rubygems.org から解決しに行く。名前は rubygems.org で空いていて
+            #   （2026-11-08 実測）、🔴 **誰かが名前を取ると、gem 側の CI がそれを黙って入れる**。
+            # ⚠ ③ と同じく、取れなかったのを「依存なし」と読まない。
+            if ! spec=$(gh api -H 'Accept: application/vnd.github.raw' "repos/pooza/$r/contents/$r.gemspec" 2>&1); then
+              echo "::error::pooza/$r の gemspec を取得できない: $(printf '%s' "$spec" | head -1)"
+              broken=$((broken + 1))
+              bad=1
+            else
+              for dep in $(printf '%s\n' "$spec" \
+                             | sed -n "s/.*add_dependency[[:space:](]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p"); do
+                decl=$(printf '%s\n' "$gemfile" \
+                         | awk -v g="$dep" '$0 ~ "^[[:space:]]*gem[[:space:]]+[\"\047]" g "[\"\047]" { f = 1 }
+                                            f { buf = buf " " $0; if ($0 !~ /,[[:space:]]*$/) { print buf; exit } }')
+                if [ -z "$decl" ]; then
+                  echo "::error::pooza/$r の Gemfile が $dep を宣言していない（gemspec が名前で要求している。rubygems.org から解決しに行く）"
+                  broken=$((broken + 1))
+                  bad=1
+                elif ! printf '%s' "$decl" | grep -Eq '(github|git):'; then
+                  echo "::error::pooza/$r の Gemfile の $dep が git の参照ではない（rubygems.org から解決しに行く）"
+                  broken=$((broken + 1))
+                  bad=1
+                fi
+              done
+            fi
           done
 
           # ⚠ warning は流れて消える。ジョブサマリに残して、週次で一覧が読める形にする。
@@ -227,7 +253,7 @@ jobs:
           echo "最新タグ: \`$latest\` (\`$latest_sha\`)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- 古い参照（SHA だがタグが古い）: $stale 件" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 🔴 壊れている参照（タグ / @main / タグの無い SHA / 参照なし）: $broken 件" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🔴 壊れている参照（タグ / @main / タグの無い SHA / 参照なし / gemspec の依存が git で未宣言）: $broken 件" >> "$GITHUB_STEP_SUMMARY"
 
           exit $bad
 
@@ -271,9 +297,22 @@ jobs:
           # ⚠⚠ **「GEMS に無い」「タグが 1 本も無い」「取得できない」を分ける（Codex P2）。**
           #   1 つにまとめると、タグが全部消えた gem への参照が「対象外」の warning に化け、
           #   存在しない `tag:` まで緑のまま素通りする。
-          declare -A fetched tags latest latest_sha
+          declare -A fetched tags latest latest_sha deps
           bad=0
           for g in $GEMS; do
+            # ①' gemspec が名前で要求する `ginseng-*`（#151）。⚠⚠ gem 側の gemspec は `ginseng-core` を
+            #   **名前で**要求するので、利用側がそれを git で宣言していないと、Bundler は rubygems.org から
+            #   解決しに行く。名前は rubygems.org で空いていて（2026-11-08 実測）、いまは「解決できずに止まる」
+            #   だが、🔴 **誰かが名前を取ると黙って通る**（依存の取り違え）。⚠ 取れなかったのを「依存なし」と読まない。
+            if ! spec=$(GH_TOKEN=$TOKEN_1 gh api -H 'Accept: application/vnd.github.raw' \
+                          "repos/pooza/$g/contents/$g.gemspec" 2>&1); then
+              echo "::error::pooza/$g の gemspec を取得できない: $(printf '%s' "$spec" | head -1)"
+              deps[$g]=failed
+              bad=1
+            else
+              deps[$g]=$(printf '%s\n' "$spec" \
+                           | sed -n "s/.*add_dependency[[:space:](]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p" | tr '\n' ' ')
+            fi
             if ! t=$(GH_TOKEN=$TOKEN_1 gh api "repos/pooza/$g/tags" --paginate \
                        --jq '.[] | "\(.commit.sha) \(.name)"' 2>&1); then
               echo "::error::pooza/$g のタグ一覧を取得できない: $(printf '%s' "$t" | head -1)"
@@ -452,11 +491,29 @@ jobs:
                   unpinned=$((unpinned + 1))
                 fi
               else
-                echo "::error::$where が git 参照ではない（形を読めない）"
+                # 🔴 git の参照が無い宣言は、rubygems.org から解決しに行く（#151）。
+                echo "::error::$where が git 参照ではない（形を読めない。rubygems.org から解決しうる）"
                 row "$g" - "\`${latest[$g]}\`" '🔴 形を読めない'
                 broken=$((broken + 1))
               fi
             done <<< "$decls"
+
+            # ④ 間接に要る `ginseng-*` を宣言しているか（#151）。⚠⚠ `ginseng-web` だけを git で宣言しても、
+            #   それが要求する `ginseng-core` は rubygems.org から解決しに行く（①' を参照）。
+            # ⚠ gemspec を取れなかった gem は判定できない（①' で error 済みなので、ここでは数えない）。
+            declared=" $(printf '%s\n' "$decls" \
+                          | sed -n "s/^[[:space:]]*gem[[:space:]]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p" | tr '\n' ' ') "
+            missing=' '
+            for g in $declared; do
+              [ "${deps[$g]:-}" = failed ] && continue
+              for dep in ${deps[$g]:-}; do
+                [[ "$declared" == *" $dep "* || "$missing" == *" $dep "* ]] && continue
+                missing="$missing$dep "
+                echo "::error::$label（$branch）は $g を使うが、$g が名前で要求する $dep を Gemfile で宣言していない（rubygems.org から解決しに行く）"
+                row "$dep" - "\`${latest[$dep]:-なし}\`" '🔴 間接の依存が未宣言'
+                broken=$((broken + 1))
+              done
+            done
           done
 
           # ⚠ warning は流れて消える。週次の一覧はサマリが正本。「古い」「未固定」「壊れ」は
@@ -465,7 +522,7 @@ jobs:
           echo "- 🟡 古い（タグ / SHA が最新でない）: $stale 件" >> "$GITHUB_STEP_SUMMARY"
           echo "- ⚠ 未固定（branch: / ref なし）: $unpinned 件" >> "$GITHUB_STEP_SUMMARY"
           echo "- ➖ 固定しないと決めたもの: $by_choice 件" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 🔴 壊れている（読めない / タグが無い / 形を読めない）: $broken 件" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🔴 壊れている（読めない / タグが無い / 形を読めない / 間接の依存が未宣言）: $broken 件" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "⚠ private と他 org のリポジトリは名前を出さず、\`GEM_WATCH_CONSUMERS\` の順番（伏せ字 #N）で示す" >> "$GITHUB_STEP_SUMMARY"
 
