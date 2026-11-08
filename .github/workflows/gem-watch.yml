@@ -299,20 +299,30 @@ jobs:
           #   存在しない `tag:` まで緑のまま素通りする。
           declare -A fetched tags latest latest_sha deps
           bad=0
-          for g in $GEMS; do
-            # ①' gemspec が名前で要求する `ginseng-*`（#151）。⚠⚠ gem 側の gemspec は `ginseng-core` を
-            #   **名前で**要求するので、利用側がそれを git で宣言していないと、Bundler は rubygems.org から
-            #   解決しに行く。名前は rubygems.org で空いていて（2026-11-08 実測）、いまは「解決できずに止まる」
-            #   だが、🔴 **誰かが名前を取ると黙って通る**（依存の取り違え）。⚠ 取れなかったのを「依存なし」と読まない。
-            if ! spec=$(GH_TOKEN=$TOKEN_1 gh api -H 'Accept: application/vnd.github.raw' \
-                          "repos/pooza/$g/contents/$g.gemspec" 2>&1); then
-              echo "::error::pooza/$g の gemspec を取得できない: $(printf '%s' "$spec" | head -1)"
-              deps[$g]=failed
-              bad=1
-            else
-              deps[$g]=$(printf '%s\n' "$spec" \
-                           | sed -n "s/.*add_dependency[[:space:](]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p" | tr '\n' ' ')
+
+          # gemspec が名前で要求する `ginseng-*`（#151）。⚠⚠ gem 側の gemspec は `ginseng-core` を
+          #   **名前で**要求するので、利用側がそれを git で宣言していないと、Bundler は rubygems.org から
+          #   解決しに行く。名前は rubygems.org で空いていて（2026-11-08 実測）、いまは「解決できずに止まる」
+          #   だが、🔴 **誰かが名前を取ると黙って通る**（依存の取り違え）。
+          # 🔴 **利用側が固定している版の gemspec を読む (#152 Codex P2)。** 既定ブランチで読むと、
+          #   `ginseng-web` は 4.0.0 で初めて `ginseng-core` を要求した（v3.0.5 には無い）ので、
+          #   古いタグに固定した利用側を誤って赤にし、逆に依存を外した版では見逃す。
+          # ⚠ 取れなかったのを「依存なし」と読まない（`failed` を返す）。結果は版ごとに覚える。
+          deps_at() {
+            local key="$1@$2" spec
+            if [ -z "${deps[$key]+x}" ]; then
+              if spec=$(GH_TOKEN=$TOKEN_1 gh api -H 'Accept: application/vnd.github.raw' \
+                          "repos/pooza/$1/contents/$1.gemspec${2:+?ref=$2}" 2>&1); then
+                deps[$key]=$(printf '%s\n' "$spec" \
+                               | sed -n "s/.*add_dependency[[:space:](]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p" | tr '\n' ' ')
+              else
+                deps[$key]=failed
+              fi
             fi
+            printf '%s' "${deps[$key]}"
+          }
+
+          for g in $GEMS; do
             if ! t=$(GH_TOKEN=$TOKEN_1 gh api "repos/pooza/$g/tags" --paginate \
                        --jq '.[] | "\(.commit.sha) \(.name)"' 2>&1); then
               echo "::error::pooza/$g のタグ一覧を取得できない: $(printf '%s' "$t" | head -1)"
@@ -430,6 +440,8 @@ jobs:
               continue
             fi
 
+            unset revs
+            declare -A revs
             while IFS= read -r d; do
               g=$(printf '%s' "$d" | sed -n "s/^[[:space:]]*gem[[:space:]]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p")
               key() { printf '%s' "$d" | sed -n "s/.*[^a-z_]$1:[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p"; }
@@ -437,6 +449,8 @@ jobs:
               ref=$(key ref)
               br=$(key branch)
               where="$label の $g（$branch）"
+              # ⚠ ④ で、この版の gemspec を読む（空なら既定ブランチ）。
+              revs[$g]=${tag:-${ref:-$br}}
 
               case "${fetched[$g]:-}" in
                 '')
@@ -500,13 +514,23 @@ jobs:
 
             # ④ 間接に要る `ginseng-*` を宣言しているか（#151）。⚠⚠ `ginseng-web` だけを git で宣言しても、
             #   それが要求する `ginseng-core` は rubygems.org から解決しに行く（①' を参照）。
-            # ⚠ gemspec を取れなかった gem は判定できない（①' で error 済みなので、ここでは数えない）。
             declared=" $(printf '%s\n' "$decls" \
                           | sed -n "s/^[[:space:]]*gem[[:space:]]*['\"]\(ginseng-[a-z0-9_-]*\)['\"].*/\1/p" | tr '\n' ' ') "
             missing=' '
             for g in $declared; do
-              [ "${deps[$g]:-}" = failed ] && continue
-              for dep in ${deps[$g]:-}; do
+              # ⚠ 見張りの対象外の gem は、上で warning 済み。
+              [ -n "${fetched[$g]:-}" ] || continue
+              rev=${revs[$g]:-}
+              # ⚠ `$(…)` の中で覚えても親へ戻らないので、先に 1 回呼んで覚えさせる。
+              deps_at "$g" "$rev" > /dev/null
+              gdeps=${deps[$g@$rev]}
+              if [ "$gdeps" = failed ]; then
+                echo "::error::$label（$branch）の $g の gemspec（${rev:-既定ブランチ}）を取得できない。間接の依存を判定できない"
+                row "$g" "\`${rev:--}\`" "\`${latest[$g]:-なし}\`" '🔴 gemspec を読めない'
+                broken=$((broken + 1))
+                continue
+              fi
+              for dep in $gdeps; do
                 [[ "$declared" == *" $dep "* || "$missing" == *" $dep "* ]] && continue
                 missing="$missing$dep "
                 echo "::error::$label（$branch）は $g を使うが、$g が名前で要求する $dep を Gemfile で宣言していない（rubygems.org から解決しに行く）"
