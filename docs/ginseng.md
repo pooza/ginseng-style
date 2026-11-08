@@ -205,6 +205,9 @@ done
 
 **急がないが、放置もしない。** 起点は `ginseng-style` の追跡 Issue（`rollout` ラベル。4.0.7 は #114、4.0.9 は #131）。
 
+- **気づく口は週次の [gem-watch](../.github/workflows/gem-watch.yml)**（`consumers` ジョブの `.ruby-version` の step。#122）。同じ系列の最新パッチより古い利用側を warning とサマリの表に出す。比べる先は ruby-lang.org のリリース一覧（preview / rc は除く）
+  - ⚠ **赤にはしない。** サーバーに版が入るまで上げられない（下の「順番」）ので、古い期間が必ずある。⚠ ただし一覧や `.ruby-version` を読めなかったときは error
+  - ⚠ `.ruby-version` を持たない利用側（OS 標準の Ruby で動かすもの）は「対象外」。系列だけの指定（`3.4`）は古いとは言わない
 - ⚠⚠ **リリース告知ではなく default gem の版差を見る。** 4.0.7 は告知に CVE が無かったが、同梱の resolv が CVE を直していた（#114）
 - 🔴 **順番は「サーバー → アプリ側の `.ruby-version`」。** 逆にすると起動しない。サーバー側が終わったら追跡 Issue にコメントがあり、それを合図に PR を配る
 - 🔴 **`.ruby-version` を上げる PR で、`Gemfile.lock` の `BUNDLED WITH` もその Ruby に同梱の bundler へそろえる** (#131)。同梱の版は `RBENV_VERSION=<版> gem list bundler` の `default:` の先頭で確かめ、`bundle update --bundler=<その版>` で書き換える

@@ -299,6 +299,9 @@ jobs:
           #   存在しない `tag:` まで緑のまま素通りする。
           declare -A fetched tags latest latest_sha deps
           bad=0
+          # ⑤ 次の step（`.ruby-version`・#122）へ渡す「読めるトークンの番号と見るブランチ」。
+          #   ⚠ トークンそのものは書かない。⚠ 空のファイルを先に作る — 無ければ「ここまで来なかった」
+          : > "$RUNNER_TEMP/ruby-targets.tsv"
 
           # gemspec が名前で要求する `ginseng-*`（#151）。⚠⚠ gem 側の gemspec は `ginseng-core` を
           #   **名前で**要求するので、利用側がそれを git で宣言していないと、Bundler は rubygems.org から
@@ -415,6 +418,8 @@ jobs:
               broken=$((broken + 1))
               continue
             fi
+            if [ "$tok" = "$TOKEN_1" ]; then tok_n=1; else tok_n=2; fi
+            printf '%s\t%s\t%s\t%s\n' "$label" "$repo" "$tok_n" "$branch" >> "$RUNNER_TEMP/ruby-targets.tsv"
 
             if ! gemfile=$(GH_TOKEN=$tok gh api -H 'Accept: application/vnd.github.raw' \
                              "repos/$repo/contents/Gemfile?ref=$branch" 2> gh-err.txt); then
@@ -552,6 +557,122 @@ jobs:
 
           [ "$broken" -eq 0 ] || bad=1
           exit $bad
+
+      # ⚠⚠ パッチ版は「急がないが放置もしない」(#114)。気づく口が人の目しか無かったので、
+      #   同じ系列の最新パッチより古い `.ruby-version` を週次で一覧に出す (#122)。
+      # 🔴 **赤にはしない（warning だけ）。** サーバーに版が入るまで `.ruby-version` は上げられない
+      #   ので、古い期間が必ずある。⚠ ただし「比べられなかった」は error（見張らないまま緑にしない）。
+      # ⚠ 対象とトークンとブランチは前の step が決めたもの（`ruby-targets.tsv`）。名前の伏せ方も同じ
+      #   （`::add-mask::` はジョブの残りの step にも効く）。
+      - name: check .ruby-version in consumers
+        if: ${{ !cancelled() }}
+        env:
+          TOKEN_1: ${{ secrets.GEM_WATCH_DISPATCH_TOKEN }}
+          TOKEN_2: ${{ secrets.GEM_WATCH_READ_TOKEN }}
+        run: |
+          set -uo pipefail
+          ruby -e '
+            require "date"
+            require "net/http"
+            require "open3"
+            require "yaml"
+
+            targets = File.join(ENV.fetch("RUNNER_TEMP"), "ruby-targets.tsv")
+            rows = []
+            bad = 0
+            stale = 0
+            out = lambda do
+              File.open(ENV["GITHUB_STEP_SUMMARY"], "a") do |f|
+                f.puts "## 利用側の \`.ruby-version\`（#122）"
+                f.puts ""
+                f.puts "| 利用側 | \`.ruby-version\` | 系列の最新 | |"
+                f.puts "| --- | --- | --- | --- |"
+                rows.each { |r| f.puts r }
+                f.puts ""
+                f.puts "- 🟡 古い（同じ系列に新しいパッチがある）: #{stale} 件"
+              end
+            end
+
+            # ⚠⚠ **ファイルが無いのを「対象なし」と読まない。** 前の step が途中で止まっている。
+            unless File.exist?(targets)
+              warn "::error::ruby-targets.tsv が無い（利用側の一覧を作る前に止まった）"
+              rows << "| - | - | - | 🔴 対象を決められない |"
+              out.call
+              exit 1
+            end
+
+            # 比べる先は ruby-lang.org のリリース一覧。⚠ preview / rc は除く（系列の「最新パッチ」ではない）。
+            begin
+              uri = URI("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
+              res = Net::HTTP.get_response(uri)
+              raise "HTTP #{res.code}" unless res.is_a?(Net::HTTPSuccess)
+              versions = YAML.safe_load(res.body, permitted_classes: [Date]).map { |r| r["version"].to_s }
+              latest = versions.grep(/\A\d+\.\d+\.\d+\z/)
+                               .group_by { |v| v[/\A\d+\.\d+/] }
+                               .transform_values { |vs| vs.max_by { |v| Gem::Version.new(v) } }
+              raise "版が 1 つも無い" if latest.empty?
+            rescue StandardError => e
+              # ⚠⚠ 「取れなかった」を「最新のまま」と読まない（linters と同じ）。
+              warn "::error::Ruby のリリース一覧を取得できない: #{e.message}"
+              rows << "| - | - | 🔴 取得できない | - |"
+              out.call
+              exit 1
+            end
+
+            lines = File.readlines(targets, chomp: true).reject(&:empty?)
+            if lines.empty?
+              # ⚠ 一覧があるのに 1 本も読めていない。見張らないまま緑にしない。
+              warn "::error::.ruby-version を見る利用側が 1 本も無い（前の step で全部読めなかった）"
+              rows << "| - | - | - | 🔴 対象なし |"
+              out.call
+              exit 1
+            end
+
+            lines.each do |line|
+              label, repo, tok_n, branch = line.split("\t")
+              where = "#{label}（#{branch}）"
+              body, err, st = Open3.capture3(
+                { "GH_TOKEN" => ENV.fetch("TOKEN_#{tok_n}") },
+                "gh", "api", "-H", "Accept: application/vnd.github.raw",
+                "repos/#{repo}/contents/.ruby-version?ref=#{branch}"
+              )
+              unless st.success?
+                if err.include?("(HTTP 404)")
+                  # ⚠ OS 標準の Ruby で動かすものは `.ruby-version` を持たない。警告にしない。
+                  # ⚠ 「リポジトリが無い」の 404 とは区別しないが、ここに来るのは前の step で
+                  #   中身を読めると確かめたものだけなので、404 はファイルが無いことを指す。
+                  rows << "| #{where} | なし | - | ➖ 対象外 |"
+                else
+                  warn "::error::#{where} の .ruby-version を読めない: #{err.lines.last.to_s.strip}"
+                  rows << "| #{where} | - | - | 🔴 読めない |"
+                  bad = 1
+                end
+                next
+              end
+
+              # ⚠ `ruby-` の接頭辞（rbenv / chruby の書き方）は外す。1 行目だけを見る。
+              v = body.lines.first.to_s.strip.delete_prefix("ruby-")
+              series = v[/\A\d+\.\d+/]
+              newest = latest[series] if series
+              if v.match?(/\A\d+\.\d+\z/) && newest
+                # ⚠ 系列だけの指定は、入れる側が最新のパッチを選ぶ。古いとは言わない。
+                rows << "| #{where} | \`#{v}\` | #{newest} | ✅ 系列のみ |"
+              elsif !v.match?(/\A\d+\.\d+\.\d+\z/) || newest.nil?
+                # ⚠ 形が読めないものは比べられない。黙って ✅ にしない。
+                warn "::warning::#{where} の .ruby-version（#{v}）を比べられない（形が違う / 一覧に無い系列）"
+                rows << "| #{where} | \`#{v}\` | - | ⚠ 比べられない |"
+              elsif Gem::Version.new(v) < Gem::Version.new(newest)
+                warn "::warning::#{where} の .ruby-version は #{v}（#{series} の最新は #{newest}）"
+                rows << "| #{where} | \`#{v}\` | #{newest} | 🟡 古い |"
+                stale += 1
+              else
+                rows << "| #{where} | \`#{v}\` | #{newest} | ✅ |"
+              end
+            end
+
+            out.call
+            exit bad
+          '
 
   # ⚠⚠ #65 で gem 側 7 本のタグを `workflow_dispatch` 契機にした。押すのは人なので、
   # **押し忘れは自動では直らない**。⚠ これは仮定ではない — 2026-08-27 時点で
