@@ -51,11 +51,11 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 ## ⚠ ginseng-* の利用者
 
-`Gemfile` / `*.gemspec` で `ginseng` を参照しているリポジトリが対象。gem 側（`ginseng-fediverse` / `ginseng-web` / `ginseng-redis` / `ginseng-postgres` / `ginseng-piefed` / `ginseng-youtube`）とアプリ側（`mulukhiya-toot-proxy` / `makoto2` / `cure-api` / `tomato-shrieker` / `loquat` / `shooby-do-bop` / `dqdai-anniv` / `chubo-core` / `kariyon`）、および **private リポジトリ数本**がある。
+`Gemfile` / `*.gemspec` で `ginseng` を参照しているリポジトリが対象。gem 側（`ginseng-fediverse` / `ginseng-web` / `ginseng-redis` / `ginseng-postgres` / `ginseng-piefed` / `ginseng-youtube`）とアプリ側（`mulukhiya-toot-proxy` / `makoto2` / `cure-api` / `tomato-shrieker` / `loquat` / `shooby-do-bop` / `dqdai-anniv` / `chubo-core` / `kariyon` / `capsicum-relay`）、および **private リポジトリ数本**がある。
 
 ⚠ **このリポジトリは public。** private リポジトリと他 org のリポジトリの名前は書かない。⚠⚠ **全リストはセッションメモリ側が正本**（`ginseng-*` 管理セッションの `project_ginseng-consumers`）。
 
-⚠ **`capsicum-relay` は `.rubocop.yml` を持つが ginseng に依存していない。** 配布対象に含めるかは別途判断する。
+⚠ **`capsicum-relay` は `ginseng-*` に依存していないが、配布対象に含める**（2026-11-13 に戻した）。`ginseng-style` を `Gemfile` で SHA 固定して参照しているので、`ginseng-style` の配布先で、gem-watch の `consumers` でも見張る。⚠ 2026-09-03 に一度は「ginseng 非依存＝対象外」としたが、その後 `ginseng-style` を参照するようになった
 
 ### ⚠⚠ ピン留めのばらけ（2026-08-19 時点の実測）
 
