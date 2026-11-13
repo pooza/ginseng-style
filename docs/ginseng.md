@@ -167,7 +167,7 @@ steps:
 | 形 | 実例 |
 | --- | --- |
 | **上流に入ったのに写しが残っている** | `MisskeyService#oauth_server_metadata`。gem 側と同じ日に入り、利用側の写しが消されないまま 9 か月残っていた |
-| **gem の作りのせいで写すしかなかった** | `Redis#initialize`。gem が `self.class.dsn` ではなく `Service.dsn` と決め打ちしているので、DSN を差し替えるには `initialize` を丸ごと写すしかない（`TagContainer.new` の決め打ちと同じ形） |
+| **gem の作りのせいで写すしかなかった** | `Redis#initialize`。gem が `self.class.dsn` ではなく `Service.dsn` と決め打ちしていたので、DSN を差し替えるには `initialize` を丸ごと写すしかなかった（`TagContainer.new` の決め打ちと同じ形）。⚠ `ginseng-redis` 2.1.1 で直した（[pooza/ginseng-redis#80](https://github.com/pooza/ginseng-redis/pull/80)） |
 | **一般化できる拡張を抱えている** | Redis のロックの道具（`SET NX EX` / compare-and-delete）、JSON で読み書きする `get` / `set` の写しが約 12 本 |
 
 **How to apply:**
