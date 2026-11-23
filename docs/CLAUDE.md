@@ -51,7 +51,7 @@ pooza の Ruby プロジェクト共通の **RuboCop 設定と規約の正本**�
 
 ## ⚠ ginseng-* の利用者
 
-`Gemfile` / `*.gemspec` で `ginseng` を参照しているリポジトリが対象。gem 側（`ginseng-fediverse` / `ginseng-web` / `ginseng-redis` / `ginseng-postgres` / `ginseng-piefed` / `ginseng-youtube`）とアプリ側（`mulukhiya-toot-proxy` / `makoto2` / `cure-api` / `tomato-shrieker` / `loquat` / `shooby-do-bop` / `dqdai-anniv` / `chubo-core` / `kariyon` / `capsicum-relay`）、および **private リポジトリ数本**がある。
+`Gemfile` / `*.gemspec` で `ginseng` を参照しているリポジトリが対象。gem 側（`ginseng-fediverse` / `ginseng-web` / `ginseng-redis` / `ginseng-postgres` / `ginseng-piefed` / `ginseng-youtube`）とアプリ側（`mulukhiya-toot-proxy` / `makoto2` / `cure-api` / `tomato-shrieker` / `loquat` / `shooby-do-bop` / `dqdai-anniv` / `chubo-core` / `kariyon` / `capsicum-relay` / `hadlar`）、および **private リポジトリ数本**がある。
 
 ⚠ **このリポジトリは public。** private リポジトリと他 org のリポジトリの名前は書かない。⚠⚠ **全リストはセッションメモリ側が正本**（`ginseng-*` 管理セッションの `project_ginseng-consumers`）。
 
